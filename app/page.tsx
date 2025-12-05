@@ -129,11 +129,12 @@ function buildSummaryFrequenciesFromRange(
         percNum = parsedNum; // ya viene como 40.7 o similar
       }
     }
+    const rounded = Number(percNum.toFixed(1));
 
     freqs.push({
       label,
-      value: percNum,
-      percentage: percNum,
+      value: rounded,
+      percentage: rounded,
     });
   }
 

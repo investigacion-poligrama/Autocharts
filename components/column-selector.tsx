@@ -584,61 +584,71 @@ export function ColumnSelector({
             )}
 
             <div className="space-y-1">
-              {colorRows.map((freq) => {
-                const adjusted = adjustedPercentages[freq.label];
-                const showAdjusted =
-                  adjusted !== undefined &&
-                  adjusted !== freq.percentage &&
-                  !isExcluded(freq.label);
+  {colorRows.map((freq) => {
+    const adjusted = adjustedPercentages[freq.label];
+    const showAdjusted =
+      adjusted !== undefined &&
+      adjusted !== freq.percentage &&
+      !isExcluded(freq.label);
 
-                return (
-                  <div
-                    key={freq.label}
-                    className={rowClass(freq.label)}
-                    onClick={(e) => {
-                      if (e.altKey) {
-                        onToggleExclude(freq.label);
-                        return;
-                      }
-                      setSelectedLabel(freq.label);
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      onToggleExclude(freq.label);
-                    }}
-                    role="button"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <input
-                        type="color"
-                        value={customColors[freq.label] || "#00a651"}
-                        onChange={(e) =>
-                          onColorChange(freq.label, e.target.value)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-8 h-8 rounded cursor-pointer border border-border flex-shrink-0"
-                        title="Choose color"
-                        style={{ minWidth: 32, minHeight: 32 }}
-                        disabled={isExcluded(freq.label)}
-                      />
-                      <span className="text-muted-foreground truncate">
-                        {freq.label}{" "}
-                        {isExcluded(freq.label) && (
-                          <em className="ml-2 text-[11px]">[Excluido]</em>
-                        )}
-                      </span>
-                    </div>
+    // 🔹 aquí redondeamos lo que se muestra
+    const displayValue =
+      typeof freq.value === "number"
+        ? Number(freq.value.toFixed(1))
+        : freq.value;
 
-                    <span className="font-medium text-foreground whitespace-nowrap">
-                      {freq.value}{" "}
-                      {showAdjusted
-                        ? `(${freq.percentage}% → ${adjustedPercentages[freq.label]}%)`
-                        : `(${freq.percentage}%)`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+    const displayPct =
+      typeof freq.percentage === "number"
+        ? Number(freq.percentage.toFixed(1))
+        : freq.percentage;
+
+    return (
+      <div
+        key={freq.label}
+        className={rowClass(freq.label)}
+        onClick={(e) => {
+          if (e.altKey) {
+            onToggleExclude(freq.label);
+            return;
+          }
+          setSelectedLabel(freq.label);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onToggleExclude(freq.label);
+        }}
+        role="button"
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <input
+            type="color"
+            value={customColors[freq.label] || "#00a651"}
+            onChange={(e) => onColorChange(freq.label, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-8 h-8 rounded cursor-pointer border border-border flex-shrink-0"
+            title="Choose color"
+            style={{ minWidth: 32, minHeight: 32 }}
+            disabled={isExcluded(freq.label)}
+          />
+          <span className="text-muted-foreground truncate">
+            {freq.label}{" "}
+            {isExcluded(freq.label) && (
+              <em className="ml-2 text-[11px]">[Excluido]</em>
+            )}
+          </span>
+        </div>
+
+        <span className="font-medium text-foreground whitespace-nowrap">
+          {displayValue}{" "}
+          {showAdjusted
+            ? `(${displayPct}% → ${adjustedPercentages[freq.label]}%)`
+            : `(${displayPct}%)`}
+        </span>
+      </div>
+    );
+  })}
+</div>
+
 
             <details className="mt-3">
               <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
