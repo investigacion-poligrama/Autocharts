@@ -298,7 +298,7 @@ function colorForProblem(
 /* ------------------------------------------------------------------ */
 
 export function buildTrackingSvg({
-  data= [],
+  data = [],
   title,
   columns,
   customColors = {},
@@ -308,10 +308,15 @@ export function buildTrackingSvg({
   inputMode,
   sheetValues,
   answerRange,
+  backgroundColor,
+  textColor,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ?? "#bdbdbd";
 
   const isTall1440 = W === 1440 && H === 1800;
 
@@ -350,13 +355,12 @@ export function buildTrackingSvg({
 
   const lineY = titleY + titleBlockH + 16;
 
-
-   let trackingData:
+  let trackingData:
     | { months: string[]; categories: { name: string; values: number[] }[] }
     | null = null;
 
   if (inputMode === "summary") {
-    // TABLA DE RESULTADOS (como tu screenshot)
+    // TABLA DE RESULTADOS
     trackingData = extractTrackingDataSummary(sheetValues || [], answerRange);
     if (!trackingData) {
       return basicTrackingMessageSvg(
@@ -364,7 +368,7 @@ export function buildTrackingSvg({
       );
     }
   } else {
-    // MODO BASE DE DATOS (lógica anterior)
+    // MODO BASE DE DATOS
     if (!columns || columns.length === 0) {
       return basicTrackingMessageSvg(
         "No hay columnas suficientes para tracking"
@@ -416,7 +420,7 @@ export function buildTrackingSvg({
 
   const maxValue = Math.max(
     10,
-    ...categories.flatMap((c) => c.values) 
+    ...categories.flatMap((c) => c.values)
   );
   const yMax = Math.ceil(maxValue / 10) * 10;
 
@@ -439,7 +443,7 @@ export function buildTrackingSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
@@ -449,7 +453,7 @@ export function buildTrackingSvg({
   parts.push(
     `<line x1="${marginLeft}" y1="${lineY}" x2="${
       W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2" />`
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
   // Poligrama / Poder. / Ganar.
@@ -459,7 +463,7 @@ export function buildTrackingSvg({
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -469,13 +473,13 @@ export function buildTrackingSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   /* -------------------- LEYENDA (pills) -------------------- */
@@ -505,7 +509,7 @@ export function buildTrackingSvg({
       `<rect x="${x}" y="${y}" width="${pillWidth}" height="${pillHeight}" rx="20" ry="20" fill="${color}" />`
     );
 
-    // texto del pill, con wrap a 2 líneas
+    // texto del pill, con wrap a 2 líneas (siempre blanco sobre color)
     const legendFs = 22;
     const maxChars = 18;
     const cx = x + pillWidth / 2;
@@ -567,7 +571,7 @@ export function buildTrackingSvg({
       }" y2="${y}" stroke="${ChartConfig.colors.neutral}" stroke-width="0.5" opacity="0.3" />`,
       `<text x="${
         chartX0 - 10
-      }" y="${y + 4}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="20" text-anchor="end">${Math.round(
+      }" y="${y + 4}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="20" text-anchor="end">${Math.round(
         value
       )}</text>`
     );
@@ -584,7 +588,7 @@ export function buildTrackingSvg({
     parts.push(
       `<text x="${x}" y="${
         chartY0 + chartHeight + 24
-      }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">${esc(
+      }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">${esc(
         month
       )}</text>`
     );
@@ -647,8 +651,7 @@ export function buildTrackingSvg({
     points.forEach((pt) => {
       const baseY = pt.y - 8;
 
-      // Color del texto más oscuro que la línea
-      const textColor = darken(color, 0.35);
+      const textColorPoint = darken(color, 0.35);
 
       // sistema anti-overlap por mes
       if (!labelSlots[pt.monthIdx]) labelSlots[pt.monthIdx] = [];
@@ -673,7 +676,7 @@ export function buildTrackingSvg({
       // número
       parts.push(
         `<text x="${pt.x}" y="${finalY}"
-        fill="${textColor}"
+        fill="${textColorPoint}"
         stroke="#000000"
         stroke-width="2"
         paint-order="stroke"
@@ -688,7 +691,7 @@ export function buildTrackingSvg({
 
   // Footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );

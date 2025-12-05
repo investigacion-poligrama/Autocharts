@@ -26,7 +26,9 @@ export interface ChartSvgArgs {
   sheetValues?: any[][];
   stackedLabelCells?: string;     
   stackedRangesSummary?: string;
-  answerRange?: string;      
+  answerRange?: string;
+  backgroundColor?: string;
+  textColor?: string;      
 }
 
 /* ------------------------------------------------------------------ */
@@ -274,9 +276,22 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       sheetTitle: args.sheetTitle,
       width: args.width,
       height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
-  bar: (args) => buildBarSvg(args),
+  bar: (args) =>
+  buildBarSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+  }),
+
 
   matrix: (args) =>
     buildMatrixSvg({
@@ -291,6 +306,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       inputMode: args.inputMode,
       sheetValues: args.sheetValues,
       secondAnswerRange: args.secondAnswerRange,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
   score: (args) =>
@@ -301,6 +318,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       sheetTitle: args.sheetTitle,
       width: args.width,
       height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
   approval: (args) =>
@@ -311,6 +330,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       sheetTitle: args.sheetTitle,
       width: args.width,
       height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor, 
     }),
 
   partido: (args) =>
@@ -321,6 +342,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       sheetTitle: args.sheetTitle,
       width: args.width,
       height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
   tracking: (args) =>
@@ -335,6 +358,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       inputMode: args.inputMode,
       sheetValues: args.sheetValues,
       answerRange: args.answerRange,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
   mediumdonut: (args) =>
@@ -351,6 +376,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       inputMode: args.inputMode,
       sheetValues: args.sheetValues,
       secondAnswerRange: args.secondAnswerRange,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     }),
 
   stacked: (args) => {
@@ -366,6 +393,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       sheetTitle: args.sheetTitle,
       width: args.width,
       height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
     });
   },
 };

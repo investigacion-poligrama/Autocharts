@@ -160,6 +160,8 @@ export default function Home() {
   const [sheets, setSheets] = useState<Array<{ name: string; id: number }>>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [customColors, setCustomColors] = useState<Record<string, string>>({});
+  const [previewBg, setPreviewBg] = useState<string>("#000000");
+  const [previewTextColor, setPreviewTextColor] = useState<string>("#FFFFFF");
   const [ordered, setOrdered] = useState<FrequencyData[]>([]);
   const [excludedLabels, setExcludedLabels] = useState<string[]>([]);
   const [inputMode, setInputMode] = useState<InputMode>("raw");
@@ -491,6 +493,8 @@ const labelOrder = useMemo(
     stackedLabelCells,
     stackedRangesSummary,
     answerRange,
+    backgroundColor: previewBg, 
+    textColor: previewTextColor,
   });
 
   addChart({
@@ -551,6 +555,11 @@ const canShowPreview = useMemo(() => {
               onInputModeChange={setInputMode}
               canvasPreset={canvasPreset}
               onCanvasPresetChange={setCanvasPreset}
+              previewBg={previewBg}
+              previewTextColor={previewTextColor}
+              onPreviewBgChange={setPreviewBg}
+              onPreviewTextColorChange={setPreviewTextColor}
+
             />
 
             {columns.length > 0 && (
@@ -581,6 +590,7 @@ const canShowPreview = useMemo(() => {
                   onStackedLabelCellsChange={setStackedLabelCells}
                   stackedRangesSummary={stackedRangesSummary}
                   onStackedRangesSummaryChange={setStackedRangesSummary}
+                sheetValues={sheetValues}
                 />
 
                 {/* Columna de % cuando usas tabla de resultados */}
@@ -632,29 +642,31 @@ const canShowPreview = useMemo(() => {
           <div className="lg:sticky lg:top-8 lg:self-start space-y-4">
 
           {canShowPreview && (
-  <ChartPreview
-    chartType={chartType}
-    data={dataForChart}
-    title={selectedColumn}
-    secondColumn={selectedSecondColumn}
-    columns={columns}
-    customColors={customColors}
-    onAddToQueue={handleAddToQueue}
-    onDownloadZip={downloadZip}
-    batchCount={items.length}
-    stackedColumns={stackedColumns}
-    sheetTitle={selectedSheet}
-    canvasWidth={canvasWidth}
-    canvasHeight={canvasHeight}
-    inputMode={inputMode}
-    labelOrder={labelOrder}
-    sheetValues={sheetValues}    
-    secondAnswerRange= {secondAnswerRange}
-    stackedLabelCells={stackedLabelCells}
-    stackedRangesSummary={stackedRangesSummary}
-    answerRange={answerRange}
-  />
-)}
+          <ChartPreview
+            chartType={chartType}
+            data={dataForChart}
+            title={selectedColumn}
+            secondColumn={selectedSecondColumn}
+            columns={columns}
+            customColors={customColors}
+            onAddToQueue={handleAddToQueue}
+            onDownloadZip={downloadZip}
+            batchCount={items.length}
+            stackedColumns={stackedColumns}
+            sheetTitle={selectedSheet}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            inputMode={inputMode}
+            labelOrder={labelOrder}
+            sheetValues={sheetValues}    
+            secondAnswerRange= {secondAnswerRange}
+            stackedLabelCells={stackedLabelCells}
+            stackedRangesSummary={stackedRangesSummary}
+            answerRange={answerRange}
+            previewBg={previewBg}
+            previewTextColor={previewTextColor}
+          />
+        )}
 
 
           {/* SIEMPRE mostrar el resumen del lote aunque no haya gráfica */}

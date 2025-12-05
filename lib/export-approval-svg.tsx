@@ -128,6 +128,8 @@ function bgColorFor(
 type ApprovalSvgArgs = ChartSvgArgs & {
   width?: number;
   height?: number;
+  backgroundColor?: string; 
+  textColor?: string;    
 };
 
 /* ------------------------------------------------------------------ */
@@ -140,10 +142,15 @@ export function buildApprovalSvg({
   sheetTitle,
   width,
   height,
+  backgroundColor,
+  textColor,
 }: ApprovalSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ? textColor : "#bdbdbd";
+
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
@@ -229,9 +236,10 @@ export function buildApprovalSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
-        line
-      )}</text>`
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+  line
+)}</text>`
+
     );
   });
 
@@ -239,7 +247,7 @@ export function buildApprovalSvg({
   parts.push(
     `<line x1="${marginLeft}" y1="${lineY}" x2="${
       W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2" />`
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
   // Poligrama / Poder. / Ganar. + hoja
@@ -252,7 +260,7 @@ export function buildApprovalSvg({
 
     parts.push(
       `<text x="${marginLeft}" y="${sheetTitleY}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -262,13 +270,13 @@ export function buildApprovalSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   /* -------------------- BARRAS -------------------- */
@@ -303,7 +311,7 @@ export function buildApprovalSvg({
     parts.push(
       `<text x="${
         x + barWidth / 2
-      }" y="${textPctY}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle">${pct}%</text>`
+      }" y="${textPctY}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle">${pct}%</text>`
     );
 
     // label debajo
@@ -315,7 +323,7 @@ export function buildApprovalSvg({
       labelsY - ((labelLines.length - 1) * (labelFs + lineGap)) / 2;
 
     parts.push(
-      `<text x="${x + barWidth / 2}" y="${firstLineY}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">` +
+    `<text x="${x + barWidth / 2}" y="${firstLineY}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">` +
         labelLines
           .map((line, i) =>
             `<tspan x="${x + barWidth / 2}" dy="${
@@ -329,9 +337,9 @@ export function buildApprovalSvg({
 
   // Footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
-      ChartConfig.footer
-    )}</text>`
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+  ChartConfig.footer
+)}</text>`
   );
 
   parts.push(`</svg>`);

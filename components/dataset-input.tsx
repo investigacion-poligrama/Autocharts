@@ -24,6 +24,10 @@ interface DatasetInputProps {
   onInputModeChange: (mode: InputMode) => void;
   canvasPreset: CanvasPreset;
   onCanvasPresetChange: (preset: CanvasPreset) => void;
+  onPreviewBgChange: (c: string) => void;
+  onPreviewTextColorChange: (c: string) => void;
+  previewBg: string;
+  previewTextColor: string;
 }
 
 export function DatasetInput({
@@ -34,6 +38,10 @@ export function DatasetInput({
   onInputModeChange,
   canvasPreset,
   onCanvasPresetChange,
+  onPreviewBgChange,
+  onPreviewTextColorChange,
+  previewBg,
+  previewTextColor,
 }: DatasetInputProps) {
   const [url, setUrl] = useState("");
 
@@ -99,6 +107,25 @@ export function DatasetInput({
             1440 × 1800 px
           </Button>
         </div>
+        {/* 🔹 Selector de colores del preview */}
+<div className="mt-3 inline-flex gap-2 text-xs items-center">
+  <label className="text-foreground">Fondo</label>
+  <input
+    type="color"
+    value={previewBg}
+    onChange={(e) => onPreviewBgChange(e.target.value)}
+    className="w-8 h-8 rounded"
+  />
+
+  <label className="text-foreground">Texto</label>
+  <input
+    type="color"
+    value={previewTextColor}
+    onChange={(e) => onPreviewTextColorChange(e.target.value)}
+    className="w-8 h-8 rounded"
+  />
+</div>
+
       </CardHeader>
 
       <CardContent>

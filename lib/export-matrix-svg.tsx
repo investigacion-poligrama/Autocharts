@@ -4,14 +4,14 @@ import type { ChartSvgArgs } from "@/lib/chart-svgs";
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
+// ESCAPAR TEXTO
 const esc = (s?: string | null) =>
   (s ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-// ---------------- LABEL WRAPPER ----------------
-
+// WRAP DE LABELS
 function wrapMatrixLabel(text: string, maxChars = 18): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
@@ -29,14 +29,12 @@ function wrapMatrixLabel(text: string, maxChars = 18): string[] {
 
   if (current) lines.push(current);
 
-  if (lines.length > 2) {
-    return [lines[0], lines.slice(1).join(" ")];
-  }
+  if (lines.length > 2) return [lines[0], lines.slice(1).join(" ")];
+
   return lines;
 }
 
-// ---------------- PARSER % ----------------
-
+// PARSE %
 function parsePercentToNumber(raw: any): number {
   if (raw == null) return 0;
   const s = String(raw).trim();
@@ -51,8 +49,7 @@ function parsePercentToNumber(raw: any): number {
   return num;
 }
 
-// ---------------- TITLES ----------------
-
+// TITLES
 function prepareTitle(title: string, baseFontSize: number, maxChars = 115) {
   const words = title.split(/\s+/);
   const lines: string[] = [];
@@ -67,7 +64,7 @@ function prepareTitle(title: string, baseFontSize: number, maxChars = 115) {
   }
 
   if (current) lines.push(current);
-  if (lines.length > 2) lines.splice(2, lines.length - 2);
+  if (lines.length > 2) lines.splice(2);
 
   const fs = baseFontSize;
   const gap = 6;
@@ -79,8 +76,7 @@ function prepareTitle(title: string, baseFontSize: number, maxChars = 115) {
   };
 }
 
-// ---------------- TABLE COLOR ----------------
-
+// COLOR CELDA
 function cellFill(rowLabel: string, percent: number, customColors?: Record<string, string>) {
   const fallback = ChartConfig.colors.matrix.light;
   const baseHex = customColors?.[rowLabel] ?? fallback;
@@ -90,10 +86,11 @@ function cellFill(rowLabel: string, percent: number, customColors?: Record<strin
 }
 
 // ---------------- A1 HELPERS ----------------
+// Ya NO truenan si escribes "C" o "C1:".
 
 function a1ToRowCol(a1: string) {
   const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
-  if (!match) throw new Error(`Referencia A1 inválida: ${a1}`);
+  if (!match) return null;
 
   const [, colLetters, rowStr] = match;
 
@@ -104,9 +101,13 @@ function a1ToRowCol(a1: string) {
 }
 
 function parseA1Range(range: string) {
-  const [a, b] = range.split(":");
+  if (!range.trim()) return null;
+
+  const [a, b] = range.trim().split(":");
   const start = a1ToRowCol(a);
-  const end = b ? a1ToRowCol(b) : start;
+  if (!start) return null; // referencia incompleta
+
+  const end = b ? a1ToRowCol(b) ?? start : start;
 
   return {
     rowStart: Math.min(start.row, end.row),
@@ -116,7 +117,9 @@ function parseA1Range(range: string) {
   };
 }
 
-// ---------------- MAIN MATRIX EXPORT ----------------
+// ---------------------------------------------
+// SVG PRINCIPAL
+// ---------------------------------------------
 
 export function buildMatrixSvg({
   data,
@@ -130,13 +133,19 @@ export function buildMatrixSvg({
   inputMode,
   sheetValues,
   secondAnswerRange,
+  backgroundColor,
+  textColor,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
-  const bg = "#000";
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ? textColor : "#bdbdbd";
+
   const titleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
+
   const isTall = W === 1440 && H === 1800;
 
   let marginLeft = isTall ? 100 : 120;
@@ -153,33 +162,35 @@ export function buildMatrixSvg({
   const titleY = marginTop + 130;
   const lineY = titleY + titleH + 16;
 
-  // -------------------------------------------
-  // MATRIZ DATA
-  // -------------------------------------------
-
+  // DATA
   let rowOrder: string[] = [];
   let col2Labels: string[] = [];
   let matrix: Record<string, Record<string, number>> = {};
 
-  // -------- SUMMARY MODE (TABLE OF RESULTS) --------
+  // --------------------- SUMMARY MODE ---------------------
 
   if (inputMode === "summary") {
     if (!sheetValues || !secondAnswerRange) {
-      return basicMessageSvg("Define el rango de la segunda pregunta");
+      return basicMsg("Define el rango de la segunda pregunta");
     }
 
-    // Primera pregunta → ya viene procesada como "data"
     rowOrder = data.map((d) => d.label);
     const rowPerc = Object.fromEntries(data.map((d) => [d.label, d.percentage]));
 
-    // Segunda pregunta desde sheetValues + secondAnswerRange
-    let { rowStart, rowEnd, colStart, colEnd } = parseA1Range(secondAnswerRange);
+    const parsed = parseA1Range(secondAnswerRange);
 
-    if (colEnd < colStart + 1)
-      return basicMessageSvg("El rango debe tener dos columnas");
+    if (!parsed) {
+      return basicMsg("Rango A1 aún no válido");
+    }
 
-    const colLabels: string[] = [];
-    const colPerc: number[] = [];
+    let { rowStart, rowEnd, colStart, colEnd } = parsed;
+
+    if (colEnd < colStart + 1) {
+      return basicMsg("El rango debe tener dos columnas");
+    }
+
+    const labels: string[] = [];
+    const colPct: number[] = [];
 
     for (let r = rowStart; r <= rowEnd; r++) {
       const row = sheetValues[r - 1] || [];
@@ -187,36 +198,33 @@ export function buildMatrixSvg({
       const pct = row[colStart];
 
       if (!label) continue;
-      colLabels.push(String(label));
-      colPerc.push(parsePercentToNumber(pct));
+
+      labels.push(String(label));
+      colPct.push(parsePercentToNumber(pct));
     }
 
-    col2Labels = colLabels;
+    col2Labels = labels;
 
-    // Construcción de la matriz
     matrix = {};
-    rowOrder.forEach((rl) => {
-      matrix[rl] = {};
-      col2Labels.forEach((cl, idx) => {
-        matrix[rl][cl] = Math.round((rowPerc[rl] * colPerc[idx]) / 100);
+    rowOrder.forEach((r) => {
+      matrix[r] = {};
+      col2Labels.forEach((c, i) => {
+        matrix[r][c] = Math.round((rowPerc[r] * colPct[i]) / 100);
       });
     });
   }
 
-  // -------- RAW MODE (COLUMN CROSS TAB) --------
+  // --------------------- RAW MODE ---------------------
 
   if (inputMode === "raw") {
     const col1 = columns?.find((c) => c.name === title);
     const col2 = columns?.find((c) => c.name === secondColumn);
 
-    if (!col1 || !col2) {
-      return basicMessageSvg("Select both columns to generate matrix");
-    }
+    if (!col1 || !col2) return basicMsg("Select both columns to generate matrix");
 
-    rowOrder = data.map((r) => r.label);
+    rowOrder = data.map((d) => d.label);
     col2Labels = Array.from(new Set(col2.values)).filter(Boolean);
 
-    // Init matrix
     matrix = {};
     rowOrder.forEach((r) => {
       matrix[r] = {};
@@ -225,23 +233,20 @@ export function buildMatrixSvg({
 
     col1.values.forEach((v1, i) => {
       const v2 = col2.values[i];
-      if (!v1 || !v2) return;
-      if (matrix[v1] && matrix[v1][v2] != null) matrix[v1][v2]++;
+      if (v1 && v2 && matrix[v1] && matrix[v1][v2] != null) {
+        matrix[v1][v2]++;
+      }
     });
 
-    // Convert to %
     rowOrder.forEach((r) => {
       const total = Object.values(matrix[r]).reduce((a, b) => a + b, 0);
       col2Labels.forEach((c) => {
-        matrix[r][c] =
-          total > 0 ? Math.round((matrix[r][c] / total) * 100) : 0;
+        matrix[r][c] = total > 0 ? Math.round((matrix[r][c] / total) * 100) : 0;
       });
     });
   }
 
-  // -------------------------------------------
-  // START SVG BUILD
-  // -------------------------------------------
+  // ------------------- SVG OUTPUT -------------------
 
   const parts: string[] = [];
 
@@ -251,72 +256,50 @@ export function buildMatrixSvg({
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // Title
+  // Título
   titleLines.forEach((line, i) => {
     parts.push(
-      `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}" fill="#fff" font-size="${titleFs}" font-family="Helvetica" >${esc(
-        line
-      )}</text>`
+      `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}"
+        fill="${mainTextColor}" font-size="${titleFs}" font-family="Helvetica">
+        ${esc(line)}
+      </text>`
     );
   });
 
-  // Divider
+  // Línea
   parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}" stroke="#fff" stroke-width="2"/>`
+    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}"
+      stroke="${mainTextColor}" stroke-width="2"/>`
   );
 
-    // Línea
-  parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${
-      W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2" />`
-  );
-
-  // --------- HEADER: nombre de hoja + Poligrama / Poder / Ganar ---------
+  // ENCABEZADO: Poligrama / Poder / Ganar
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
   if (sheetTitle) {
-    // pequeño ajuste para el canvas alto 1440×1800
     let sheetTitleY = logoY0 + 40;
-    if (W === 1440 && H === 1800) {
-      sheetTitleY = logoY0 + 60;
-    }
+    if (isTall) sheetTitleY = logoY0 + 60;
 
     parts.push(
-      `<text x="${marginLeft}" y="${sheetTitleY}"
-             fill="#ffffff"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
+      `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
+        font-family="Helvetica" font-size="30" text-anchor="start">
         ${esc(sheetTitle)}
-       </text>`
+      </text>`
     );
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff"
-            font-family="Helvetica, Arial, sans-serif"
-            font-size="${headerFs}" font-weight="700"
-            text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="#ffffff"
-            font-family="Helvetica, Arial, sans-serif"
-            font-size="${headerFs}" font-weight="700"
-            text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="#ffffff"
-            font-family="Helvetica, Arial, sans-serif"
-            font-size="${headerFs}" font-weight="700"
-            text-anchor="end">Ganar.</text>`
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-
-  // Headers & layout
+  // LAYOUT TABLA
   const tableTop = lineY + 60;
   const tableBottom = H - marginBottom - 40;
   const tableHeight = tableBottom - tableTop;
@@ -329,34 +312,31 @@ export function buildMatrixSvg({
   const dataW = W - marginLeft - marginRight - labelColW;
   const colW = dataW / col2Labels.length;
 
-  // Column headers
+  // HEADER COLUMNA
   col2Labels.forEach((label, idx) => {
     const x = marginLeft + labelColW + idx * colW;
     const rectY = tableTop + 10;
     const rectH = headerH - 20;
 
     parts.push(
-      `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}" rx="12" fill="${customColors[label] ?? "#fff"}" />`,
-      `<text x="${x + colW / 2}" y="${
-        rectY + rectH / 2
-      }" fill="#000" font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="middle">${esc(
-        label
-      )}</text>`
+      `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
+        rx="12" fill="${customColors[label] ?? "#ffffff"}"/>`,
+      `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000"
+        font-size="20" font-weight="700" text-anchor="middle"
+        dominant-baseline="middle">${esc(label)}</text>`
     );
   });
 
-  // Rows
+  // FILAS
   rowOrder.forEach((rowLabel, rowIndex) => {
     const y = tableTop + headerH + rowIndex * rowH;
 
-    const bg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
-
+    const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
     const textLines = wrapMatrixLabel(rowLabel);
 
     parts.push(
-      `<rect x="${marginLeft}" y="${y + 6}" width="${
-        labelColW - 16
-      }" height="${rowH - 12}" rx="10" fill="${bg}"/>`
+      `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
+        height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
     );
 
     const centerX = marginLeft + (labelColW - 16) / 2;
@@ -364,22 +344,17 @@ export function buildMatrixSvg({
 
     if (textLines.length === 1) {
       parts.push(
-        `<text x="${centerX}" y="${centerY}" fill="#fff" text-anchor="middle" font-size="20" dominant-baseline="middle">${esc(
-          textLines[0]
-        )}</text>`
+        `<text x="${centerX}" y="${centerY}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20" dominant-baseline="middle">
+          ${esc(textLines[0])}
+        </text>`
       );
     } else {
       parts.push(
-        `<text x="${centerX}" y="${
-          centerY - 12
-        }" fill="#fff" text-anchor="middle" font-size="20">${esc(
-          textLines[0]
-        )}</text>`,
-        `<text x="${centerX}" y="${
-          centerY + 12
-        }" fill="#fff" text-anchor="middle" font-size="20">${esc(
-          textLines[1]
-        )}</text>`
+        `<text x="${centerX}" y="${centerY - 12}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20">${esc(textLines[0])}</text>`,
+        `<text x="${centerX}" y="${centerY + 12}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20">${esc(textLines[1])}</text>`
       );
     }
 
@@ -390,21 +365,21 @@ export function buildMatrixSvg({
       const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
 
       parts.push(
-        `<rect x="${cellX + 4}" y="${y + 6}" width="${
-          colW - 8
-        }" height="${rowH - 12}" rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
-        `<text x="${cellX + colW / 2}" y="${
-          y + rowH / 2
-        }" fill="#fff" font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="middle">${pct}%</text>`
+        `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
+          rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
+        `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
+          fill="${mainTextColor}" font-size="20" font-weight="700"
+          text-anchor="middle" dominant-baseline="middle">${pct}%</text>`
       );
     });
   });
 
-  // Footer
+  // FOOTER
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-size="${footerFs}" text-anchor="end">${esc(
-      ChartConfig.footer
-    )}</text>`
+    `<text x="${W - marginRight}" y="${H - marginBottom}"
+      fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end">
+      ${esc(ChartConfig.footer)}
+    </text>`
   );
 
   parts.push(`</svg>`);
@@ -412,13 +387,14 @@ export function buildMatrixSvg({
   return parts.join("\n");
 }
 
-// ---------------- BASIC MSG SVG ----------------
+// ------------- MENSAJE SVG SIN CRASH -------------
 
-function basicMessageSvg(message: string) {
+function basicMsg(message: string) {
   return `
     <svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}">
       <rect width="100%" height="100%" fill="#000"/>
-      <text x="${CANVAS_W / 2}" y="${CANVAS_H / 2}" fill="#fff" font-size="26" text-anchor="middle">${message}</text>
+      <text x="${CANVAS_W / 2}" y="${CANVAS_H / 2}"
+        fill="#fff" font-size="26" text-anchor="middle">${message}</text>
     </svg>
   `;
 }

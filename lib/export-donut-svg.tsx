@@ -24,6 +24,8 @@ type BuildDonutSvgArgs = {
   sheetTitle?: string;
   width?: number;
   height?: number;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 const esc = (s: string) =>
@@ -80,18 +82,22 @@ export function buildDonutSvg({
   sheetTitle,
   width,
   height,
+  backgroundColor,
+  textColor,
 }: BuildDonutSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
-  const bg = "#000000";
+  // 👇 iguales que en bar / approval
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ? textColor : "#bdbdbd";
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
-  // 🔹 detectar preset alto
   const isTall1440 = W === 1440 && H === 1800;
 
   let marginLeft: number;
@@ -100,14 +106,12 @@ export function buildDonutSvg({
   let marginBottom: number;
 
   if (isTall1440) {
-    // layout especial para 1440×1800
     marginLeft = 100;
     marginRight = 100;
     marginTop = 170;
     marginBottom = 170;
   } else {
-    // layout original 1920×1080 (no lo rompemos)
-     marginLeft = 120;
+    marginLeft = 120;
     marginRight = 120;
     marginTop = 125;
     marginBottom = 125;
@@ -128,7 +132,6 @@ export function buildDonutSvg({
   let donutAreaTop = lineY - 100;
   let donutAreaBottom = H - marginBottom;
   if (isTall1440) {
-    // usamos más altura para que el canvas no se vea vacío
     donutAreaTop = lineY - 40;
     donutAreaBottom = H - marginBottom - 40;
   }
@@ -141,8 +144,7 @@ export function buildDonutSvg({
   const cy = donutAreaTop + donutAreaHeight / 2;
 
   const safeData = data.filter((d) => d.percentage > 0);
-  const totalPerc =
-    safeData.reduce((acc, d) => acc + d.percentage, 0) || 1;
+  const totalPerc = safeData.reduce((acc, d) => acc + d.percentage, 0) || 1;
 
   // ----- Donut -----
   const slices: string[] = [];
@@ -201,13 +203,11 @@ export function buildDonutSvg({
       y0i +
       " Z";
 
-    slices.push(
-      `<path d="${dPath}" fill="${color}" stroke="none"/>`
-    );
+    slices.push(`<path d="${dPath}" fill="${color}" stroke="none"/>`);
   }
 
   // ----- Leyenda -----
-    const fsPercent = Math.max(
+  const fsPercent = Math.max(
     22,
     ChartConfig.typography.legend.percentageSize
   );
@@ -227,7 +227,7 @@ export function buildDonutSvg({
     const color =
       customColors[item.label] ?? PALETTE[i % PALETTE.length];
 
-    const pillWidth = (isTall1440 ? colWidth * 3.2 : colWidth * 3);
+    const pillWidth = isTall1440 ? colWidth * 3.2 : colWidth * 3;
     const pillHeight = 60;
 
     legendItems.push(
@@ -235,6 +235,7 @@ export function buildDonutSvg({
         legendTop + i * (pillHeight + 20)
       })">` +
         `<rect x="${-pillWidth / 2}" y="0" width="${pillWidth}" height="${pillHeight}" rx="12" ry="12" fill="${color}"/>` +
+        // 👇 estos los dejo en blanco para contraste sobre la pastilla
         `<text x="0" y="24" text-anchor="middle" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${fsPercent}" font-weight="700">${item.percentage}%</text>` +
         `<text x="0" y="44" text-anchor="middle" fill="#ffffff" font-weight="700" font-family="Helvetica, Arial, sans-serif" font-size="${fsLabel}">${esc(
           item.label
@@ -257,7 +258,7 @@ export function buildDonutSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
@@ -267,17 +268,17 @@ export function buildDonutSvg({
   parts.push(
     `<line x1="${marginLeft}" y1="${lineY}" x2="${
       W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2"/>`
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>`
   );
 
-  // Poligrama / Poder. / Ganar.
+  // Poligrama / Poder. / Ganar. + hoja
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -287,13 +288,13 @@ export function buildDonutSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   // Donut
@@ -304,7 +305,7 @@ export function buildDonutSvg({
 
   // Footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );
@@ -313,3 +314,4 @@ export function buildDonutSvg({
 
   return parts.join("\n");
 }
+

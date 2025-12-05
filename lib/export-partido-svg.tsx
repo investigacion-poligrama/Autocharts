@@ -21,12 +21,11 @@ function darkerTransparent(base: string): string {
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
 
-  const factor = 0.8; // un poco más oscuro
+  const factor = 0.8;
   const rd = Math.round(r * factor);
   const gd = Math.round(g * factor);
   const bd = Math.round(b * factor);
 
-  // mismo tono, un poco más oscuro y semi-transparente
   return `rgba(${rd}, ${gd}, ${bd}, 0.9)`;
 }
 
@@ -46,7 +45,6 @@ function wrapPartidoLabel(text: string, maxChars = 14): string[] {
   }
   if (current) lines.push(current);
 
-  // máximo 2 líneas
   if (lines.length > 2) {
     return [lines[0], lines.slice(1).join(" ")];
   }
@@ -120,10 +118,15 @@ export function buildPartidoSvg({
   sheetTitle,
   width,
   height,
+  backgroundColor,
+  textColor,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ?? "#bdbdbd";
 
   const isTall1440 = W === 1440 && H === 1800;
 
@@ -132,7 +135,6 @@ export function buildPartidoSvg({
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
-  // márgenes dependientes del preset
   let marginLeft: number;
   let marginRight: number;
   let marginTop: number;
@@ -144,7 +146,6 @@ export function buildPartidoSvg({
     marginTop = 170;
     marginBottom = 170;
   } else {
-    // layout original 1920×1080
     marginLeft = 120;
     marginRight = 120;
     marginTop = 125;
@@ -166,7 +167,6 @@ export function buildPartidoSvg({
     return basicPartidoMessageSvg("No hay datos para el gráfico de partidos");
   }
 
-  // Layout tipo “pastilla”
   const logoSize = 48;
   const gapLogoLabel = 25;
 
@@ -191,11 +191,10 @@ export function buildPartidoSvg({
 
   const blockHeight = nRows * rowHeight;
   const startY = isTall1440
-  ? marginTop + 350 
-  : (blockHeight < availableHeight
-      ? contentTop + (availableHeight - blockHeight) / 2
-      : contentTop);
-
+    ? marginTop + 350
+    : blockHeight < availableHeight
+    ? contentTop + (availableHeight - blockHeight) / 2
+    : contentTop;
 
   const parts: string[] = [];
 
@@ -210,7 +209,7 @@ export function buildPartidoSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
@@ -220,7 +219,7 @@ export function buildPartidoSvg({
   parts.push(
     `<line x1="${marginLeft}" y1="${lineY}" x2="${
       W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2" />`
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
   // Poligrama / Poder. / Ganar.
@@ -230,7 +229,7 @@ export function buildPartidoSvg({
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -240,13 +239,13 @@ export function buildPartidoSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   /* -------------------- FILAS PARTIDO -------------------- */
@@ -268,7 +267,7 @@ export function buildPartidoSvg({
       `<circle cx="${logoCx}" cy="${logoCy}" r="${
         logoSize / 1.3
       }" fill="${barColor}" />`,
-      `<text x="${logoCx}" y="${logoCy + 2}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="700" text-anchor="middle" dominant-baseline="middle">${esc(
+      `<text x="${logoCx}" y="${logoCy + 2}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="700" text-anchor="middle" dominant-baseline="middle">${esc(
         logoInitials
       )}</text>`
     );
@@ -277,8 +276,9 @@ export function buildPartidoSvg({
     const pillY = centerY - pillHeight / 2;
 
     parts.push(
-      `<rect x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="${pillHeight /
-        2}" ry="${pillHeight / 2}" fill="${barColor}" />`
+      `<rect x="${pillX}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="${
+        pillHeight / 2
+      }" ry="${pillHeight / 2}" fill="${barColor}" />`
     );
 
     // Texto del candidato dentro de la pastilla (izquierda)
@@ -286,7 +286,7 @@ export function buildPartidoSvg({
     const labelFs = 22;
     const labelLineGap = 4;
 
-    const labelStartX = pillX + 24; // padding dentro de la pastilla
+    const labelStartX = pillX + 24;
     const firstLabelY =
       centerY -
       ((labelLines.length - 1) * (labelFs + labelLineGap)) / 2 +
@@ -294,7 +294,7 @@ export function buildPartidoSvg({
 
     parts.push(
       `<text x="${labelStartX}" y="${firstLabelY}" 
-         fill="#ffffff" font-family="Helvetica, Arial, sans-serif"
+         fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif"
          font-size="${labelFs}" font-weight="700" text-anchor="start">
          ${esc(item.label)}
        </text>`
@@ -317,7 +317,7 @@ export function buildPartidoSvg({
     const pctY = centerY + 2;
 
     parts.push(
-      `<text x="${pctX}" y="${pctY}" fill="#ffffff"
+      `<text x="${pctX}" y="${pctY}" fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="24" font-weight="700"
              text-anchor="middle" dominant-baseline="middle">
@@ -328,7 +328,7 @@ export function buildPartidoSvg({
 
   // Footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );

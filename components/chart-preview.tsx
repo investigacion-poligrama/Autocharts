@@ -28,7 +28,10 @@ interface ChartPreviewProps {
   secondAnswerRange?: string;
   stackedLabelCells?: string;
   stackedRangesSummary?: string;
-  answerRange?: string;  
+  answerRange?: string;
+  previewBg: string;
+  previewTextColor: string;
+    
 }
 
 export default function ChartPreview({
@@ -52,6 +55,9 @@ export default function ChartPreview({
   stackedLabelCells,
   stackedRangesSummary,
   answerRange,
+  previewBg,
+  previewTextColor,
+
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,6 +88,8 @@ export default function ChartPreview({
       stackedLabelCells,
       stackedRangesSummary,
       answerRange,
+      backgroundColor: previewBg,
+      textColor: previewTextColor,
     });
 
     setSvgMarkup(svg);
@@ -103,6 +111,8 @@ export default function ChartPreview({
     stackedLabelCells,
     stackedRangesSummary,
     answerRange,
+    previewBg,
+    previewTextColor,
   ]);
 
   const handleExport = () => {
@@ -129,6 +139,10 @@ export default function ChartPreview({
         stackedLabelCells,
         stackedRangesSummary,
         answerRange,
+        backgroundColor: previewBg,
+        textColor: previewTextColor,
+        sheetValues,
+        secondAnswerRange,
       });
 
       const blob = new Blob([svg], {
@@ -191,7 +205,8 @@ export default function ChartPreview({
             ref={containerRef}
             className="h-full w-full"
             style={{
-              background: "#000",
+              background: previewBg,
+              color: previewTextColor,
               minHeight: 0,
               minWidth: 0,
               display: "flex",

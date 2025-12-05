@@ -269,10 +269,15 @@ export function buildMediumDonutSvg({
   inputMode,
   sheetValues,
   secondAnswerRange,
+  backgroundColor,
+  textColor,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ? textColor : "#bdbdbd";
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
@@ -312,7 +317,11 @@ export function buildMediumDonutSvg({
   // datos válidos para la dona
   const safeData = data.filter((d) => (d.percentage ?? 0) > 0);
   if (!safeData.length) {
-    return basicMediumDonutMessageSvg("No hay datos para la gráfica.");
+    return basicMediumDonutMessageSvg(
+      "No hay datos para la gráfica.",
+      bg,
+      mainTextColor
+    );
   }
 
   // orden de filas (labels)
@@ -330,7 +339,9 @@ export function buildMediumDonutSvg({
     // modo base de datos → usa columnas de microdatos
     if (!columns || !secondColumn) {
       return basicMediumDonutMessageSvg(
-        "Debes seleccionar la segunda columna para la comparativa"
+        "Debes seleccionar la segunda columna para la comparativa",
+        bg,
+        mainTextColor
       );
     }
 
@@ -360,7 +371,7 @@ export function buildMediumDonutSvg({
     }
 
     if (!colHeaders.length) {
-      // fallback: sólo columna Total (como antes)
+      // fallback: sólo columna Total
       headers = ["Total"];
       rowData = {};
       orderedLabels.forEach((label) => {
@@ -455,8 +466,8 @@ export function buildMediumDonutSvg({
     `;
 
     donutPaths.push(
-      `<path d="${dPath}" fill="${color}" stroke="#000000" stroke-width="3" />`
-    );
+  `<path d="${dPath}" fill="${color}" stroke="${color}" stroke-width="3" />`
+);
   });
 
   /* -------------------- LEYENDA -------------------- */
@@ -483,8 +494,8 @@ export function buildMediumDonutSvg({
       marginLeft + colIdx * legendColWidth + legendColWidth / 2;
     const y = legendTop + rowIdx * legendRowHeight;
 
-    const bg = mdColorFor(it.label, customColors);
-    const textColor = ChartConfig.colors.white;
+    const pillBg = mdColorFor(it.label, customColors);
+    const pillTextColor = "#ffffff";
 
     const lines = wrapLegendLabel(it.label, 28);
     const fsLabel = lines.length === 2 ? 13 : 18;
@@ -502,9 +513,9 @@ export function buildMediumDonutSvg({
          width="${legendColWidth - 8}"
          height="${rectH}"
          rx="12" ry="12"
-         fill="${bg}" />`,
+         fill="${pillBg}" />`,
       `<text x="${x}" y="${line1Y}"
-         fill="${textColor}"
+         fill="${pillTextColor}"
          font-weight="700"
          font-family="Helvetica, Arial, sans-serif"
          font-size="${fsLabel}"
@@ -513,7 +524,7 @@ export function buildMediumDonutSvg({
        </text>`,
       lines.length > 1
         ? `<text x="${x}" y="${line2Y}"
-             fill="${textColor}"
+             fill="${pillTextColor}"
              font-weight="700"
              font-family="Helvetica, Arial, sans-serif"
              font-size="${fsLabel}"
@@ -522,7 +533,7 @@ export function buildMediumDonutSvg({
            </text>`
         : "",
       `<text x="${x}" y="${pctY}"
-         fill="${textColor}"
+         fill="${pillTextColor}"
          font-weight="700"
          font-family="Helvetica, Arial, sans-serif"
          font-size="${fsPct}"
@@ -550,8 +561,7 @@ export function buildMediumDonutSvg({
 
   const labelColWidth = isTall1440 ? 190 : 260;
 
-  // headers visibles: en raw usamos headers internos ["Total", grp1, grp2...]
-  // pero queremos mostrar [grp1, grp2..., "Total"].
+  // headers visibles
   let headerLabels: string[] = [];
   if (inputMode === "raw") {
     if (headers.length === 0) {
@@ -594,8 +604,8 @@ export function buildMediumDonutSvg({
   // Filas
   labels.forEach((label, rowIdx) => {
     const y = tableBodyY + rowIdx * rowHeight;
-    const bg = mdColorFor(label, customColors);
-    const pillTextColor = ChartConfig.colors.white;
+    const pillBg = mdColorFor(label, customColors);
+    const pillTextColor = "#ffffff";
 
     const labelLines = wrapLegendLabel(label, 18);
     const labelFs = 18;
@@ -615,7 +625,7 @@ export function buildMediumDonutSvg({
     tableParts.push(
       `<rect x="${rightX0}" y="${rectY}" width="${
         labelColWidth - 16
-      }" height="${rectH}" rx="12" ry="12" fill="${bg}" />`,
+      }" height="${rectH}" rx="12" ry="12" fill="${pillBg}" />`,
       `<text x="${centerX}" y="${line1Y}"
              fill="${pillTextColor}"
              font-weight="700"
@@ -659,7 +669,7 @@ export function buildMediumDonutSvg({
           y + 6
         }" width="${colWidth - 8}" height="${
           rowHeight - 12
-        }" rx="12" ry="12" fill="${bg}" />`,
+        }" rx="12" ry="12" fill="${pillBg}" />`,
         `<text x="${
           cellX + colWidth / 2
         }" y="${
@@ -691,7 +701,7 @@ export function buildMediumDonutSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
@@ -701,7 +711,7 @@ export function buildMediumDonutSvg({
   parts.push(
     `<line x1="${marginLeft}" y1="${lineY}" x2="${
       W - marginRight
-    }" y2="${lineY}" stroke="#ffffff" stroke-width="2" />`
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
   // Poligrama / Poder. / Ganar.
@@ -711,7 +721,7 @@ export function buildMediumDonutSvg({
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -721,13 +731,13 @@ export function buildMediumDonutSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   // Dona
@@ -741,7 +751,7 @@ export function buildMediumDonutSvg({
 
   // Footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );
@@ -755,16 +765,19 @@ export function buildMediumDonutSvg({
 /*   Mensaje básico si faltan datos                                   */
 /* ------------------------------------------------------------------ */
 
-function basicMediumDonutMessageSvg(message: string): string {
+function basicMediumDonutMessageSvg(
+  message: string,
+  bg: string,
+  textColor: string
+): string {
   const W = CANVAS_W;
   const H = CANVAS_H;
-  const bg = "#000000";
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
     `<rect width="100%" height="100%" fill="${bg}" />`,
-    `<text x="${W / 2}" y="${H / 2}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">${esc(
+    `<text x="${W / 2}" y="${H / 2}" fill="${textColor}" font-family="Helvetica, Arial, sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">${esc(
       message
     )}</text>`,
     `</svg>`,

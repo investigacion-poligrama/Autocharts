@@ -33,6 +33,8 @@ type BuildStackedBarSvgArgs = {
   sheetTitle?: string;
   width?: number;
   height?: number;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 const esc = (s: string) =>
@@ -119,10 +121,15 @@ export function buildStackedBarSvg({
   sheetTitle,
   width,
   height,
+  backgroundColor,
+  textColor,
 }: BuildStackedBarSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ?? "#bdbdbd";
 
   const isTall1440 = W === 1440 && H === 1800;
 
@@ -166,7 +173,7 @@ export function buildStackedBarSvg({
       '<?xml version="1.0" encoding="UTF-8"?>',
       `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
       `<rect width="100%" height="100%" fill="${bg}" />`,
-      `<text x="${W / 2}" y="${H / 2}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">No hay datos para el gráfico apilado</text>`,
+      `<text x="${W / 2}" y="${H / 2}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">No hay datos para el gráfico apilado</text>`,
       `</svg>`,
     ].join("\n");
   }
@@ -180,9 +187,7 @@ export function buildStackedBarSvg({
   const legendHeight = 40;
   const legendGap = 24;
 
-  // en 1440 usamos un poquito más de alto de canvas
-  const barAreaTop =
-    lineY + 60 + legendHeight + legendGap;
+  const barAreaTop = lineY + 60 + legendHeight + legendGap;
   const barAreaBottom = isTall1440
     ? H - marginBottom - 60
     : H - marginBottom - 40;
@@ -289,7 +294,7 @@ export function buildStackedBarSvg({
 
     bars.push(
       `<text x="${marginLeftLabels - 20}" y="${firstLineY}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="${labelFont}"
              font-weight="700"
@@ -358,7 +363,7 @@ export function buildStackedBarSvg({
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
@@ -366,7 +371,7 @@ export function buildStackedBarSvg({
 
   // línea
   parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}" stroke="#ffffff" stroke-width="2"/>`
+    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>`
   );
 
   // Poligrama / Poder. / Ganar.
@@ -376,7 +381,7 @@ export function buildStackedBarSvg({
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="#ffffff"
+             fill="${mainTextColor}"
              font-family="Helvetica, Arial, sans-serif"
              font-size="30"
              text-anchor="start">
@@ -386,13 +391,13 @@ export function buildStackedBarSvg({
   }
 
   parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   // leyenda + barras
@@ -401,7 +406,7 @@ export function buildStackedBarSvg({
 
   // footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );

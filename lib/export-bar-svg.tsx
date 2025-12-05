@@ -21,6 +21,8 @@ type BuildBarSvgArgs = {
   sheetTitle?: string;
   width?: number;
   height?: number;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 function wrapBarLabel(text: string, maxChars = 18): string[] {
@@ -110,7 +112,6 @@ function darkenHexColor(hex: string, factor = 0.8): string {
 
   return `#${toHex(rd)}${toHex(gd)}${toHex(bd)}`;
 }
-
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
@@ -121,17 +122,22 @@ export function buildBarSvg({
   sheetTitle,
   width,
   height,
+  backgroundColor,
+  textColor,
 }: BuildBarSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-  const bg = "#000000";
+
+  // 👇 usar colores configurables
+  const bg = backgroundColor ?? "#000000";
+  const mainTextColor = textColor ?? "#ffffff";
+  const mutedTextColor = textColor ? textColor : "#bdbdbd";
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
-  
   const isTall1440 = W === 1440 && H === 1800;
 
   let marginLeft: number;
@@ -144,31 +150,26 @@ export function buildBarSvg({
   if (isTall1440) {
     marginLeft = 100;
     marginRight = 100;
-    marginTop = 170;      // más grande para que haya buen aire arriba
-    marginBottom = 170;   // simétrico abajo
+    marginTop = 170;
+    marginBottom = 170;
     marginLeftLabels = 120;
-
-    titleY = marginTop + 130; // mismo offset visual que en 1920
+    titleY = marginTop + 130;
   } else {
-    // 🔹 1920×1080 – NO TOCAR, es tu layout original
     marginLeft = 120;
     marginRight = 120;
     marginTop = 125;
     marginBottom = 125;
     marginLeftLabels = 120;
-
     titleY = marginTop + 130;
   }
 
+  const maxTitleChars = isTall1440 ? 80 : 108;
 
-    const maxTitleChars = isTall1440 ? 80 : 108;
-
-    const {
-      lines: titleLines,
-      fontSize: titleFs,
-      blockHeight: titleBlockH,
-    } = prepareTitle(title, baseTitleFs, maxTitleChars);
-
+  const {
+    lines: titleLines,
+    fontSize: titleFs,
+    blockHeight: titleBlockH,
+  } = prepareTitle(title, baseTitleFs, maxTitleChars);
 
   const lineY = titleY + titleBlockH + 16;
 
@@ -183,7 +184,6 @@ export function buildBarSvg({
 
   const rows = data.length || 1;
 
-  // datos seguros
   const normalized = data.map((d) => {
     const raw =
       typeof d.percentage === "number"
@@ -195,7 +195,6 @@ export function buildBarSvg({
     return { ...d, value };
   });
 
-  // ---------- 1) LAYOUT DE COLUMNAS ----------
   const bars: string[] = [];
 
   type LayoutRow = {
@@ -215,7 +214,6 @@ export function buildBarSvg({
   const numCols = rows > 8 ? 2 : 1;
 
   if (numCols === 1) {
-    // --- 1 sola columna (<= 8 barras) ---
     const x0 = marginLeftLabels;
     const x1 = W - marginRight;
     const colWidth = x1 - x0;
@@ -238,13 +236,12 @@ export function buildBarSvg({
       });
     });
   } else {
-    // --- 2 columnas (> 8 barras) ---
     const totalWidth = W - marginLeftLabels - marginRight;
-    const colGap = 80; // espacio entre columnas
+    const colGap = 80;
 
     const colWidth = (totalWidth - colGap) / 2;
-    const rowsLeft = Math.ceil(rows / 2); // ej. 9 -> 5
-    const rowsRight = rows - rowsLeft; // ej. 9 -> 4
+    const rowsLeft = Math.ceil(rows / 2);
+    const rowsRight = rows - rowsLeft;
 
     const makeCol = (col: number, startIdx: number, count: number) => {
       if (count <= 0) return;
@@ -275,7 +272,7 @@ export function buildBarSvg({
     makeCol(1, rowsLeft, rowsRight);
   }
 
-  // ---------- 2) DIBUJO DE BARRAS + LABEL + % ----------
+  // ---------- BARRAS + LABEL + % ----------
   layouts.forEach((layout, idx) => {
     const { item, x0, x1, barMaxWidth, gap, barHeight, rowInCol } = layout;
 
@@ -286,17 +283,14 @@ export function buildBarSvg({
     const color = customColors[item.label] ?? PALETTE[idx % PALETTE.length];
     const darkBg = darkenHexColor(color, 0.7);
 
-    // fondo traslúcido
     bars.push(
       `<rect x="${x0}" y="${top}" width="${barMaxWidth}" height="${barHeight}" fill="${darkBg}" fill-opacity="0.3" />`
     );
 
-    // valor
     bars.push(
       `<rect x="${x0}" y="${top}" width="${valueWidth}" height="${barHeight}" fill="${color}" />`
     );
 
-    // LABEL ARRIBA DEL BAR
     const cleanLabel = esc(
       String(item.label)
         .replace(/<br\s*\/?>/gi, " ")
@@ -310,7 +304,7 @@ export function buildBarSvg({
       `<text
         x="${x0}"
         y="${topLabelY}"
-        fill="#ffffff"
+        fill="${mainTextColor}"
         font-family="Helvetica, Arial, sans-serif"
         font-size="${labelFont}"
         font-weight="700"
@@ -320,7 +314,6 @@ export function buildBarSvg({
       </text>`
     );
 
-    // PORCENTAJE A LA DERECHA DE LA COLUMNA
     const percText = `${item.value}%`;
     const percPaddingRight = 10;
     const percX = x1 - percPaddingRight;
@@ -329,7 +322,7 @@ export function buildBarSvg({
       `<text
         x="${percX}"
         y="${centerY}"
-        fill="#ffffff"
+        fill="${mainTextColor}"
         font-family="Helvetica, Arial, sans-serif"
         font-size="25"
         font-weight="700"
@@ -339,7 +332,7 @@ export function buildBarSvg({
     );
   });
 
-  // ---------- 3) CABECERA Y FOOTER ----------
+  // ---------- CABECERA Y FOOTER ----------
   const parts: string[] = [];
 
   parts.push(
@@ -348,61 +341,54 @@ export function buildBarSvg({
     `<rect width="100%" height="100%" fill="${bg}"/>`
   );
 
-  // título
   const titleLineGap = 6;
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
+      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
         line
       )}</text>`
     );
   });
 
-  // línea
   parts.push(
-  `<line x1="${marginLeft}" y1="${lineY}" x2="${
-    W - marginRight
-  }" y2="${lineY}" stroke="#ffffff" stroke-width="2"/>`
-);
+    `<line x1="${marginLeft}" y1="${lineY}" x2="${
+      W - marginRight
+    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>`
+  );
 
-  // Poligrama / Poder. / Ganar.
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
   if (sheetTitle) {
-  let sheetTitleY = logoY0 + 40; 
-  if (W === 1440 && H === 1800) {
-    sheetTitleY = logoY0 + 60;    
+    let sheetTitleY = logoY0 + 40;
+    if (W === 1440 && H === 1800) sheetTitleY = logoY0 + 60;
+
+    parts.push(
+      `<text x="${marginLeft}" y="${sheetTitleY}"
+             fill="${mainTextColor}"
+             font-family="Helvetica, Arial, sans-serif"
+             font-size="30"
+             text-anchor="start">
+        ${esc(sheetTitle)}
+       </text>`
+    );
   }
 
   parts.push(
-    `<text x="${marginLeft}" y="${sheetTitleY}"
-           fill="#ffffff"
-           font-family="Helvetica, Arial, sans-serif"
-           font-size="30"
-           text-anchor="start">
-      ${esc(sheetTitle)}
-     </text>`
-  );
-}
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
     `<text x="${logoX}" y="${
       logoY0 + headerLine * 2
-    }" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-  // barras
   parts.push(`<g>`, ...bars, `</g>`);
 
-  // footer
   parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="#bdbdbd" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
+    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );

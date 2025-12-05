@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -62,6 +62,35 @@ interface ColumnSelectorProps {
   onStackedLabelCellsChange: (value: string) => void;
   stackedRangesSummary: string;
   onStackedRangesSummaryChange: (value: string) => void;
+
+  // 👇 NUEVO: para poder leer la leyenda desde el rango
+  sheetValues: any[][];
+}
+
+/* Helpers para A1 (los uso solo para stacked+summary) */
+function a1ToRowCol(a1: string) {
+  const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if (!match) throw new Error(`Referencia A1 inválida: ${a1}`);
+  const [, colLetters, rowStr] = match;
+  let col = 0;
+  for (const ch of colLetters) {
+    col = col * 26 + (ch.charCodeAt(0) - 64);
+  }
+  const row = parseInt(rowStr, 10);
+  if (!row || row < 1) throw new Error(`Fila inválida en referencia A1: ${a1}`);
+  return { row, col }; // 1-based
+}
+
+function parseA1Range(range: string) {
+  const [startStr, endStr] = range.split(":");
+  const start = a1ToRowCol(startStr);
+  const end = endStr ? a1ToRowCol(endStr) : start;
+  return {
+    rowStart: Math.min(start.row, end.row),
+    rowEnd: Math.max(start.row, end.row),
+    colStart: Math.min(start.col, end.col),
+    colEnd: Math.max(start.col, end.col),
+  };
 }
 
 export function ColumnSelector({
@@ -90,6 +119,7 @@ export function ColumnSelector({
   onStackedLabelCellsChange,
   stackedRangesSummary,
   onStackedRangesSummaryChange,
+  sheetValues,
 }: ColumnSelectorProps) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
 
@@ -136,6 +166,65 @@ export function ColumnSelector({
     `flex items-center justify-between gap-3 text-sm rounded-md px-2 py-1 transition select-none
      ${selectedLabel === label ? "ring-2 ring-primary/70 bg-muted/40" : "hover:bg-muted/30"}
      ${isExcluded(label) ? "opacity-50 line-through" : ""}`;
+
+  const isStackedSummary =
+    chartType === "stacked" && inputMode === "summary";
+
+  /* ------------------------------------------------------------------
+   *  Leyenda real para stacked + summary (leer desde answerRange)
+   * ------------------------------------------------------------------ */
+
+  const legendLabelsForStackedSummary: string[] = useMemo(() => {
+    if (!isStackedSummary) return [];
+    if (!answerRange.trim() || !sheetValues.length) return [];
+
+    try {
+      const { rowStart, rowEnd, colStart } = parseA1Range(
+        answerRange.trim()
+      );
+      const labels: string[] = [];
+
+      for (let r = rowStart; r <= rowEnd; r++) {
+        const row = sheetValues[r - 1] || [];
+        const cell = row[colStart - 1];
+        const label = cell != null ? String(cell).trim() : "";
+        if (label) labels.push(label);
+      }
+
+      // quitar duplicados
+      return Array.from(new Set(labels));
+    } catch {
+      return [];
+    }
+  }, [isStackedSummary, answerRange, sheetValues]);
+
+  /**
+   * Este es el array que realmente usamos para el selector de colores.
+   * - Normal: usamos `frequencies` entero
+   * - Stacked + summary: SOLO las etiquetas de la leyenda
+   */
+  const colorRows: FrequencyData[] = useMemo(() => {
+    if (!frequencies.length) return [];
+
+    if (!isStackedSummary) return frequencies;
+
+    if (!legendLabelsForStackedSummary.length) {
+      // si por algo no pudimos leer la leyenda, caemos al comportamiento normal
+      return frequencies;
+    }
+
+    const legendSet = new Set(legendLabelsForStackedSummary);
+
+    const byLabel = new Map<string, FrequencyData>();
+    frequencies.forEach((f) => {
+      if (!legendSet.has(f.label)) return;
+      if (!byLabel.has(f.label)) byLabel.set(f.label, f);
+    });
+
+    return Array.from(byLabel.values());
+  }, [frequencies, isStackedSummary, legendLabelsForStackedSummary]);
+
+  const showFreqList = colorRows.length > 0;
 
   return (
     <Card>
@@ -242,7 +331,9 @@ export function ColumnSelector({
                           onCheckedChange={(checked) => {
                             const next = checked
                               ? [...stackedColumns, column.name]
-                              : stackedColumns.filter((c) => c !== column.name);
+                              : stackedColumns.filter(
+                                  (c) => c !== column.name
+                                );
                             onStackedColumnsChange(next);
                           }}
                           className="text-xs whitespace-normal break-words"
@@ -360,8 +451,8 @@ export function ColumnSelector({
                     className="max-w-md"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Cada rango (etiquetas + %) define una barra apilada.
-                    Usa comas para separar las barras. Ejemplo:{" "}
+                    Cada rango (etiquetas + %) define una barra apilada. Usa
+                    comas para separar las barras. Ejemplo:{" "}
                     <code className="font-mono">
                       C7:D11, C13:D17, C19:D23
                     </code>
@@ -374,7 +465,7 @@ export function ColumnSelector({
         )}
 
         {/* Frecuencia de respuestas y colores */}
-        {frequencies.length > 0 && (
+        {showFreqList && (
           <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
             <div className="flex items-baseline justify-between">
               <h4 className="text-sm font-medium text-foreground">
@@ -386,6 +477,13 @@ export function ColumnSelector({
                 excluir/incluir.
               </div>
             </div>
+
+            {isStackedSummary && (
+              <p className="text-xs text-muted-foreground">
+                (En stacked + tabla de resultados solo se muestran las opciones
+                de la <strong>leyenda</strong>: Muy buena, Buena, Regular, etc.)
+              </p>
+            )}
 
             {excludedLabels.length > 0 && (
               <div className="text-xs flex items-center justify-between rounded bg-muted px-2 py-1">
@@ -405,7 +503,7 @@ export function ColumnSelector({
             )}
 
             <div className="space-y-1">
-              {frequencies.map((freq) => {
+              {colorRows.map((freq) => {
                 const adjusted = adjustedPercentages[freq.label];
                 const showAdjusted =
                   adjusted !== undefined &&
