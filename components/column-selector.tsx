@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { RangePicker } from "@/components/ui/range-picker";
+
 
 interface ColumnSelectorProps {
   columns: DatasetColumn[];
@@ -122,6 +124,14 @@ export function ColumnSelector({
   sheetValues,
 }: ColumnSelectorProps) {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+    type RangePickerTarget =
+    | "question"
+    | "answer"
+    | "stackedLabels"
+    | "stackedRanges";
+
+  const [rangePickerTarget, setRangePickerTarget] =
+    useState<RangePickerTarget | null>(null);
 
   const availableColors: Record<string, string> = {
     Si: "#00a651",
@@ -360,16 +370,29 @@ export function ColumnSelector({
         {inputMode === "summary" && (
           <div className="space-y-4">
             {/* Celda con la pregunta (título grande) */}
-            <div className="space-y-2">
+                        <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Celda con la pregunta
               </label>
-              <Input
-                value={questionCell}
-                onChange={(e) => onQuestionCellChange(e.target.value)}
-                placeholder="Ej. C6"
-                className="max-w-xs"
-              />
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={questionCell}
+                  onChange={(e) => onQuestionCellChange(e.target.value)}
+                  placeholder="Ej. C6"
+                  className="max-w-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRangePickerTarget("question")}
+                  disabled={!sheetValues.length}
+                >
+                  Seleccionar
+                </Button>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 Usa notación A1 (columna + fila). Ejemplo:{" "}
                 <code className="font-mono">C6</code> para la celda donde está
@@ -379,17 +402,30 @@ export function ColumnSelector({
 
             {/* Para TODOS los gráficos de tabla excepto stacked:
                 rango “normal” etiqueta + % */}
-            {chartType !== "stacked" && (
+                        {chartType !== "stacked" && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
                   Rango de respuestas y %
                 </label>
-                <Input
-                  value={answerRange}
-                  onChange={(e) => onAnswerRangeChange(e.target.value)}
-                  placeholder="Ej. B7:C15"
-                  className="max-w-xs"
-                />
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={answerRange}
+                    onChange={(e) => onAnswerRangeChange(e.target.value)}
+                    placeholder="Ej. B7:C15"
+                    className="max-w-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRangePickerTarget("answer")}
+                    disabled={!sheetValues.length}
+                  >
+                    Seleccionar
+                  </Button>
+                </div>
+
                 <p className="text-xs text-muted-foreground">
                   El rango debe incluir{" "}
                   <span className="font-semibold">dos columnas</span>: la
@@ -401,55 +437,101 @@ export function ColumnSelector({
             )}
 
             {/* Específico para stacked – tabla de resultados */}
-            {chartType === "stacked" && (
+                        {chartType === "stacked" && (
               <>
+                {/* Posibles respuestas (para la leyenda) */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Posibles respuestas (para la leyenda)
                   </label>
-                  <Input
-                    value={answerRange}
-                    onChange={(e) => onAnswerRangeChange(e.target.value)}
-                    placeholder="Ej. C4:D7"
-                    className="max-w-xs"
-                  />
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={answerRange}
+                      onChange={(e) =>
+                        onAnswerRangeChange(e.target.value)
+                      }
+                      placeholder="Ej. C4:D7"
+                      className="max-w-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRangePickerTarget("answer")}
+                      disabled={!sheetValues.length}
+                    >
+                      Seleccionar
+                    </Button>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
                     Rango con las opciones de respuesta (etiquetas + %). Solo
                     se usan las etiquetas para la leyenda superior.
                   </p>
                 </div>
 
+                {/* ✅ NUEVO: Celdas con el título de cada stacked bar */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Celdas con el título de cada barra
                   </label>
-                  <Input
-                    value={stackedLabelCells}
-                    onChange={(e) =>
-                      onStackedLabelCellsChange(e.target.value)
-                    }
-                    placeholder="Ej. B7,B13,B19"
-                    className="max-w-xs"
-                  />
+
+                  <div className="flex items-center gap-2 max-w-md">
+                    <Input
+                      value={stackedLabelCells}
+                      onChange={(e) =>
+                        onStackedLabelCellsChange(e.target.value)
+                      }
+                      placeholder="Ej. B76,B86,B96"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRangePickerTarget("stackedLabels")}
+                      disabled={!sheetValues.length}
+                    >
+                      Seleccionar
+                    </Button>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
-                    Lista de celdas separadas por coma. Cada celda contiene el
-                    título corto de una barra (por ejemplo, el nombre de cada
-                    persona evaluada).
+                    Lista de celdas (separadas por coma), cada una con el
+                    título de una barra. Ejemplo:{" "}
+                    <code className="font-mono">B76,B86,B96</code>.
+                    Cuando uses el selector, el rango elegido se agregará al
+                    final de la lista.
                   </p>
                 </div>
 
+                {/* Rangos de respuestas por barra */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Rangos de respuestas por barra
                   </label>
-                  <Input
-                    value={stackedRangesSummary}
-                    onChange={(e) =>
-                      onStackedRangesSummaryChange(e.target.value)
-                    }
-                    placeholder="Ej. C7:D11, C13:D17, C19:D23"
-                    className="max-w-md"
-                  />
+
+                  <div className="flex items-center gap-2 max-w-md">
+                    <Input
+                      value={stackedRangesSummary}
+                      onChange={(e) =>
+                        onStackedRangesSummaryChange(e.target.value)
+                      }
+                      placeholder="Ej. C7:D11, C13:D17, C19:D23"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRangePickerTarget("stackedRanges")}
+                      disabled={!sheetValues.length}
+                    >
+                      Seleccionar
+                    </Button>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
                     Cada rango (etiquetas + %) define una barra apilada. Usa
                     comas para separar las barras. Ejemplo:{" "}
@@ -460,10 +542,9 @@ export function ColumnSelector({
                   </p>
                 </div>
               </>
-            )}
+            )}  
           </div>
         )}
-
         {/* Frecuencia de respuestas y colores */}
         {showFreqList && (
           <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
@@ -585,6 +666,41 @@ export function ColumnSelector({
               </div>
             </details>
           </div>
+        )}
+                {rangePickerTarget && sheetValues.length > 0 && (
+          <RangePicker
+            open={true}
+            sheetValues={sheetValues}
+            target={rangePickerTarget}
+            initialRange={
+              rangePickerTarget === "question"
+                ? questionCell
+                : rangePickerTarget === "answer"
+                ? answerRange
+                : rangePickerTarget === "stackedLabels"
+                ? stackedLabelCells
+                : stackedRangesSummary
+            }
+            onClose={() => setRangePickerTarget(null)}
+            onConfirm={(range, target) => {
+              if (target === "question") {
+                onQuestionCellChange(range);
+              } else if (target === "answer") {
+                onAnswerRangeChange(range);
+              } else if (target === "stackedLabels") {
+                // por ahora: si ya hay algo, agregamos con coma
+                const next = stackedLabelCells
+                  ? `${stackedLabelCells}, ${range}`
+                  : range;
+                onStackedLabelCellsChange(next);
+              } else if (target === "stackedRanges") {
+                const next = stackedRangesSummary
+                  ? `${stackedRangesSummary}, ${range}`
+                  : range;
+                onStackedRangesSummaryChange(next);
+              }
+            }}
+          />
         )}
       </CardContent>
     </Card>

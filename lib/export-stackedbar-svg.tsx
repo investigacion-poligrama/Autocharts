@@ -46,7 +46,7 @@ type WrappedTitle = {
   blockHeight: number;
 };
 
-function wrapLabel(text: string, maxChars = 40): string[] {
+function wrapLabel(text: string, maxChars = 35): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
   let current = "";
@@ -227,7 +227,7 @@ export function buildStackedBarSvg({
       );
 
       // wrap del texto de la leyenda (1-2 líneas)
-      const maxChars = 18;
+      const maxChars = 15;
       const words = segLabel.split(/\s+/);
 
       let lines: string[] = [];
@@ -283,7 +283,7 @@ export function buildStackedBarSvg({
     const top = centerY - barHeight / 2;
 
     // label de la fila (a la izquierda)
-    const rowLabelLines = wrapLabel(row.label, 35);
+    const rowLabelLines = wrapLabel(row.label, 25);
     const labelFont = 20;
     const labelLineGap = 4;
     const totalLines = rowLabelLines.length;
