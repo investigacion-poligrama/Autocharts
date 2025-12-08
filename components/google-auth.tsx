@@ -14,9 +14,12 @@ export function GoogleAuth({ onAuthSuccess }: GoogleAuthProps) {
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
+console.log("GOOGLE_CLIENT_ID EN FRONT:", GOOGLE_CLIENT_ID);
+
 if (!GOOGLE_CLIENT_ID) {
   throw new Error("Falta la variable NEXT_PUBLIC_GOOGLE_CLIENT_ID");
 }
+
 
 
   useEffect(() => {
