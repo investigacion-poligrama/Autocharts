@@ -305,7 +305,7 @@ parts.push(
     font-family="${FONT_STACK}">Ganar.</text>`
 );
 
-// LAYOUT TABLA
+
 const tableTop = lineY + 60;
 const tableBottom = H - marginBottom - 40;
 const tableHeight = tableBottom - tableTop;
@@ -318,7 +318,6 @@ const labelColW = 280;
 const dataW = W - marginLeft - marginRight - labelColW;
 const colW = dataW / col2Labels.length;
 
-// HEADER COLUMNA
 col2Labels.forEach((label, idx) => {
   const x = marginLeft + labelColW + idx * colW;
   const rectY = tableTop + 10;
@@ -326,14 +325,15 @@ col2Labels.forEach((label, idx) => {
 
   parts.push(
     `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
-      rx="12" fill="${customColors[label] ?? "#ffffff"}"/>`,
-    `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000"
+      rx="12" fill="#ffffff"/>`,
+    `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000000"
       font-size="20" font-weight="700" text-anchor="middle"
       dominant-baseline="middle" font-family="${FONT_STACK}">
       ${esc(label)}
     </text>`
   );
 });
+
 
 // FILAS
 rowOrder.forEach((rowLabel, rowIndex) => {
