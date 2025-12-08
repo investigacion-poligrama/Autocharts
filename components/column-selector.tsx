@@ -590,8 +590,6 @@ export function ColumnSelector({
       adjusted !== undefined &&
       adjusted !== freq.percentage &&
       !isExcluded(freq.label);
-
-    // 🔹 aquí redondeamos lo que se muestra
     const displayValue =
       typeof freq.value === "number"
         ? Number(freq.value.toFixed(1))
