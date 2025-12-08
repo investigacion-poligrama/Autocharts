@@ -383,27 +383,32 @@ export function buildTrackingSvg({
   }
 
   let { months, categories } = trackingData;
-  if (!months.length || !categories.length) {
-    return basicTrackingMessageSvg("No hay datos suficientes para tracking");
-  }
+if (!months.length || !categories.length) {
+  return basicTrackingMessageSvg("No hay datos suficientes para tracking");
+}
 
-  const dragOrder = (data || []).map((d) => d.label);
-  if (dragOrder.length) {
-    const byName = new Map(categories.map((c) => [c.name, c]));
-    const orderedCats: typeof categories = [];
-    for (const label of dragOrder) {
-      const cat = byName.get(label);
-      if (cat) {
-        orderedCats.push(cat);
-        byName.delete(label);
-      }
-    }
-    for (const cat of byName.values()) {
+// labels activos (no excluidos) según dataForChart
+const dragOrder = (data || []).map((d) => d.label);
+
+if (dragOrder.length) {
+  const byName = new Map(categories.map((c) => [c.name, c]));
+  const orderedCats: typeof categories = [];
+
+  for (const label of dragOrder) {
+    const cat = byName.get(label);
+    if (cat) {
       orderedCats.push(cat);
     }
-
-    categories = orderedCats;
   }
+
+  categories = orderedCats;
+}
+
+// si el usuario excluyó TODO, evita crashear
+if (!categories.length) {
+  return basicTrackingMessageSvg("No hay datos (todas las categorías excluidas).");
+}
+
 
   // --- Layout general: leyenda izquierda, gráfico derecha ---
 
