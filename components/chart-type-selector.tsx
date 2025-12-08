@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";       
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import type { ChartType, DatasetColumn } from "@/app/page";
 import { Input } from "@/components/ui/input";
+import { RangePicker } from "@/components/ui/range-picker"; // ruta igual que en ColumnSelector
 
 interface ChartTypeSelectorProps {
   chartType: ChartType;
@@ -39,6 +41,7 @@ interface ChartTypeSelectorProps {
   onSecondQuestionCellChange: (value: string) => void;
   secondAnswerRange: string;
   onSecondAnswerRangeChange: (value: string) => void;
+  sheetValues: any[][];                         // ✅
 }
 
 export function ChartTypeSelector({
@@ -53,9 +56,18 @@ export function ChartTypeSelector({
   onSecondQuestionCellChange,
   secondAnswerRange,
   onSecondAnswerRangeChange,
+  sheetValues,                                  // ✅ DES-ESTRUCTURADO
 }: ChartTypeSelectorProps) {
+  // solo lo usamos aquí para saber cuál de los dos campos estamos editando
+  type SecondRangeTarget = "secondQuestion" | "secondAnswer";
+  const [secondRangeTarget, setSecondRangeTarget] =
+    useState<SecondRangeTarget | null>(null);
+
+  // si quieres que donut también pida segunda pregunta, métele "donut" aquí
   const needsSecondColumn =
     chartType === "matrix" || chartType === "mediumdonut";
+    // o:  chartType === "matrix" || chartType === "mediumdonut" || chartType === "donut";
+
   return (
     <Card>
       <CardHeader>
@@ -67,6 +79,7 @@ export function ChartTypeSelector({
 
       <CardContent className="space-y-4">
         <div className="grid grid-cols-5 gap-2">
+          {/* botones de tipo de gráfica */}
           <Button
             variant={chartType === "partido" ? "default" : "outline"}
             onClick={() => onSelect("partido")}
@@ -167,8 +180,7 @@ export function ChartTypeSelector({
           </Button>
         </div>
 
-                {/* SEGUNDA PREGUNTA */}
-        {/* 🔹 Modo BASE DE DATOS: sigue siendo un Select de columnas */}
+        {/* SEGUNDA PREGUNTA - modo BASE DE DATOS */}
         {needsSecondColumn && showMatrixOption && inputMode === "raw" && (
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
@@ -195,19 +207,35 @@ export function ChartTypeSelector({
           </div>
         )}
 
-        {/* 🔹 Modo TABLA DE RESULTADOS: celda + rango (como la primera pregunta) */}
+        {/* SEGUNDA PREGUNTA - modo TABLA DE RESULTADOS */}
         {needsSecondColumn && showMatrixOption && inputMode === "summary" && (
           <div className="space-y-4">
+            {/* Celda con la segunda pregunta */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Celda con la segunda pregunta
               </label>
-              <Input
-                value={secondQuestionCell}
-                onChange={(e) => onSecondQuestionCellChange(e.target.value)}
-                placeholder="Ej. H6"
-                className="max-w-xs"
-              />
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={secondQuestionCell}
+                  onChange={(e) =>
+                    onSecondQuestionCellChange(e.target.value)
+                  }
+                  placeholder="Ej. H6"
+                  className="max-w-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSecondRangeTarget("secondQuestion")}
+                  disabled={!sheetValues.length}
+                >
+                  Seleccionar
+                </Button>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 Usa notación A1 (columna + fila). Ejemplo:{" "}
                 <code className="font-mono">H6</code> para la celda donde está
@@ -215,16 +243,32 @@ export function ChartTypeSelector({
               </p>
             </div>
 
+            {/* Rango de respuestas y % (segunda pregunta) */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Rango de respuestas y % (segunda pregunta)
               </label>
-              <Input
-                value={secondAnswerRange}
-                onChange={(e) => onSecondAnswerRangeChange(e.target.value)}
-                placeholder="Ej. H7:I15"
-                className="max-w-xs"
-              />
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={secondAnswerRange}
+                  onChange={(e) =>
+                    onSecondAnswerRangeChange(e.target.value)
+                  }
+                  placeholder="Ej. H7:I15"
+                  className="max-w-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSecondRangeTarget("secondAnswer")}
+                  disabled={!sheetValues.length}
+                >
+                  Seleccionar
+                </Button>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 El rango debe incluir{" "}
                 <span className="font-semibold">dos columnas</span>: la primera
@@ -235,6 +279,32 @@ export function ChartTypeSelector({
           </div>
         )}
 
+        {/* RangePicker para la segunda pregunta (summary) */}
+        {secondRangeTarget && sheetValues.length > 0 && (
+          <RangePicker
+            open={true}
+            sheetValues={sheetValues}
+            // usamos los mismos targets que el RangePicker original
+            target={
+              secondRangeTarget === "secondQuestion" ? "question" : "answer"
+            }
+            initialRange={
+              secondRangeTarget === "secondQuestion"
+                ? secondQuestionCell
+                : secondAnswerRange
+            }
+            onClose={() => setSecondRangeTarget(null)}
+            // ignoramos el segundo parámetro (target) del callback,
+            // usamos nuestro estado secondRangeTarget
+            onConfirm={(range) => {
+              if (secondRangeTarget === "secondQuestion") {
+                onSecondQuestionCellChange(range);
+              } else {
+                onSecondAnswerRangeChange(range);
+              }
+            }}
+          />
+        )}
       </CardContent>
     </Card>
   );

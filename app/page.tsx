@@ -639,6 +639,7 @@ const canShowPreview = useMemo(() => {
                 onSecondQuestionCellChange={setSecondQuestionCell}
                 secondAnswerRange={secondAnswerRange}             
                 onSecondAnswerRangeChange={setSecondAnswerRange}
+                sheetValues={sheetValues}
               />
               </>
             )}
