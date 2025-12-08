@@ -12,8 +12,12 @@ export function GoogleAuth({ onAuthSuccess }: GoogleAuthProps) {
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [token, setToken] = useState<string | null>(null);
 
-  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 
-    "923015740783-jf88ictnu24ofn4raoul82khbqnvhfpc.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+if (!GOOGLE_CLIENT_ID) {
+  throw new Error("Falta la variable NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+}
+
 
   useEffect(() => {
     const loadGoogleScripts = async () => {
