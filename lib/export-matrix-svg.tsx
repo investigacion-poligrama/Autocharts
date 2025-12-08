@@ -3,6 +3,8 @@ import type { ChartSvgArgs } from "@/lib/chart-svgs";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
+const FONT_STACK =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
 // ESCAPAR TEXTO
 const esc = (s?: string | null) =>
@@ -136,6 +138,7 @@ export function buildMatrixSvg({
   backgroundColor,
   textColor,
 }: ChartSvgArgs): string {
+
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
@@ -248,143 +251,157 @@ export function buildMatrixSvg({
 
   // ------------------- SVG OUTPUT -------------------
 
-  const parts: string[] = [];
+const parts: string[] = [];
+
+parts.push(
+  `<?xml version="1.0" encoding="UTF-8"?>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+  `<rect width="100%" height="100%" fill="${bg}" />`
+);
+
+// Título
+titleLines.forEach((line, i) => {
+  parts.push(
+    `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}"
+      fill="${mainTextColor}" font-size="${titleFs}" font-family="${FONT_STACK}">
+      ${esc(line)}
+    </text>`
+  );
+});
+
+// Línea
+parts.push(
+  `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}"
+    stroke="${mainTextColor}" stroke-width="2"/>`
+);
+
+// ENCABEZADO: Poligrama / Poder / Ganar
+const logoX = W - marginRight;
+const logoY0 = marginTop - 24;
+const headerFs = 40;
+const headerLine = headerFs * 1.1;
+
+if (sheetTitle) {
+  let sheetTitleY = logoY0 + 40;
+  if (isTall) sheetTitleY = logoY0 + 60;
 
   parts.push(
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
-    `<rect width="100%" height="100%" fill="${bg}" />`
+    `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
+      font-family="${FONT_STACK}" font-size="30" text-anchor="start">
+      ${esc(sheetTitle)}
+    </text>`
+  );
+}
+
+parts.push(
+  `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
+    font-size="${headerFs}" font-weight="700" text-anchor="end"
+    font-family="${FONT_STACK}">Poligrama.</text>`,
+  `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
+    font-size="${headerFs}" font-weight="700" text-anchor="end"
+    font-family="${FONT_STACK}">Poder.</text>`,
+  `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
+    font-size="${headerFs}" font-weight="700" text-anchor="end"
+    font-family="${FONT_STACK}">Ganar.</text>`
+);
+
+// LAYOUT TABLA
+const tableTop = lineY + 60;
+const tableBottom = H - marginBottom - 40;
+const tableHeight = tableBottom - tableTop;
+
+const headerH = 70;
+const rowsH = tableHeight - headerH;
+const rowH = rowsH / rowOrder.length;
+
+const labelColW = 280;
+const dataW = W - marginLeft - marginRight - labelColW;
+const colW = dataW / col2Labels.length;
+
+// HEADER COLUMNA
+col2Labels.forEach((label, idx) => {
+  const x = marginLeft + labelColW + idx * colW;
+  const rectY = tableTop + 10;
+  const rectH = headerH - 20;
+
+  parts.push(
+    `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
+      rx="12" fill="${customColors[label] ?? "#ffffff"}"/>`,
+    `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000"
+      font-size="20" font-weight="700" text-anchor="middle"
+      dominant-baseline="middle" font-family="${FONT_STACK}">
+      ${esc(label)}
+    </text>`
+  );
+});
+
+// FILAS
+rowOrder.forEach((rowLabel, rowIndex) => {
+  const y = tableTop + headerH + rowIndex * rowH;
+
+  const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
+  const textLines = wrapMatrixLabel(rowLabel);
+
+  parts.push(
+    `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
+      height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
   );
 
-  // Título
-  titleLines.forEach((line, i) => {
+  const centerX = marginLeft + (labelColW - 16) / 2;
+  const centerY = y + rowH / 2;
+
+  if (textLines.length === 1) {
     parts.push(
-      `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}"
-        fill="${mainTextColor}" font-size="${titleFs}" font-family="Helvetica">
-        ${esc(line)}
+      `<text x="${centerX}" y="${centerY}" fill="${mainTextColor}"
+        text-anchor="middle" font-size="20" dominant-baseline="middle"
+        font-family="${FONT_STACK}">
+        ${esc(textLines[0])}
       </text>`
     );
-  });
-
-  // Línea
-  parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}"
-      stroke="${mainTextColor}" stroke-width="2"/>`
-  );
-
-  // ENCABEZADO: Poligrama / Poder / Ganar
-  const logoX = W - marginRight;
-  const logoY0 = marginTop - 24;
-  const headerFs = 40;
-  const headerLine = headerFs * 1.1;
-
-  if (sheetTitle) {
-    let sheetTitleY = logoY0 + 40;
-    if (isTall) sheetTitleY = logoY0 + 60;
-
+  } else {
     parts.push(
-      `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
-        font-family="Helvetica" font-size="30" text-anchor="start">
-        ${esc(sheetTitle)}
+      `<text x="${centerX}" y="${centerY - 12}" fill="${mainTextColor}"
+        text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
+        ${esc(textLines[0])}
+      </text>`,
+      `<text x="${centerX}" y="${centerY + 12}" fill="${mainTextColor}"
+        text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
+        ${esc(textLines[1])}
       </text>`
     );
   }
 
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
-  );
+  col2Labels.forEach((colLabel, colIndex) => {
+    const cellX = marginLeft + labelColW + colIndex * colW;
+    const pct = matrix[rowLabel][colLabel] ?? 0;
 
-  // LAYOUT TABLA
-  const tableTop = lineY + 60;
-  const tableBottom = H - marginBottom - 40;
-  const tableHeight = tableBottom - tableTop;
-
-  const headerH = 70;
-  const rowsH = tableHeight - headerH;
-  const rowH = rowsH / rowOrder.length;
-
-  const labelColW = 280;
-  const dataW = W - marginLeft - marginRight - labelColW;
-  const colW = dataW / col2Labels.length;
-
-  // HEADER COLUMNA
-  col2Labels.forEach((label, idx) => {
-    const x = marginLeft + labelColW + idx * colW;
-    const rectY = tableTop + 10;
-    const rectH = headerH - 20;
+    const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
 
     parts.push(
-      `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
-        rx="12" fill="${customColors[label] ?? "#ffffff"}"/>`,
-      `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000"
-        font-size="20" font-weight="700" text-anchor="middle"
-        dominant-baseline="middle">${esc(label)}</text>`
+      `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
+        rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
+      `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
+        fill="${mainTextColor}" font-size="20" font-weight="700"
+        text-anchor="middle" dominant-baseline="middle"
+        font-family="${FONT_STACK}">
+        ${pct}%
+      </text>`
     );
   });
+});
 
-  // FILAS
-  rowOrder.forEach((rowLabel, rowIndex) => {
-    const y = tableTop + headerH + rowIndex * rowH;
+// FOOTER
+parts.push(
+  `<text x="${W - marginRight}" y="${H - marginBottom}"
+    fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end"
+    font-family="${FONT_STACK}">
+    ${esc(ChartConfig.footer)}
+  </text>`
+);
 
-    const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
-    const textLines = wrapMatrixLabel(rowLabel);
+parts.push(`</svg>`);
 
-    parts.push(
-      `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
-        height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
-    );
-
-    const centerX = marginLeft + (labelColW - 16) / 2;
-    const centerY = y + rowH / 2;
-
-    if (textLines.length === 1) {
-      parts.push(
-        `<text x="${centerX}" y="${centerY}" fill="${mainTextColor}"
-          text-anchor="middle" font-size="20" dominant-baseline="middle">
-          ${esc(textLines[0])}
-        </text>`
-      );
-    } else {
-      parts.push(
-        `<text x="${centerX}" y="${centerY - 12}" fill="${mainTextColor}"
-          text-anchor="middle" font-size="20">${esc(textLines[0])}</text>`,
-        `<text x="${centerX}" y="${centerY + 12}" fill="${mainTextColor}"
-          text-anchor="middle" font-size="20">${esc(textLines[1])}</text>`
-      );
-    }
-
-    col2Labels.forEach((colLabel, colIndex) => {
-      const cellX = marginLeft + labelColW + colIndex * colW;
-      const pct = matrix[rowLabel][colLabel] ?? 0;
-
-      const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
-
-      parts.push(
-        `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
-          rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
-        `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
-          fill="${mainTextColor}" font-size="20" font-weight="700"
-          text-anchor="middle" dominant-baseline="middle">${pct}%</text>`
-      );
-    });
-  });
-
-  // FOOTER
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}"
-      fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end">
-      ${esc(ChartConfig.footer)}
-    </text>`
-  );
-
-  parts.push(`</svg>`);
-
-  return parts.join("\n");
+return parts.join("\n");
 }
 
 // ------------- MENSAJE SVG SIN CRASH -------------
@@ -393,8 +410,16 @@ function basicMsg(message: string) {
   return `
     <svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}">
       <rect width="100%" height="100%" fill="#000"/>
-      <text x="${CANVAS_W / 2}" y="${CANVAS_H / 2}"
-        fill="#fff" font-size="26" text-anchor="middle">${message}</text>
+      <text
+        x="${CANVAS_W / 2}"
+        y="${CANVAS_H / 2}"
+        fill="#fff"
+        font-size="26"
+        text-anchor="middle"
+        font-family="${FONT_STACK}"
+      >
+        ${message}
+      </text>
     </svg>
   `;
 }
