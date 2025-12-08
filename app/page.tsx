@@ -468,10 +468,15 @@ const labelOrder = useMemo(
   if (!selectedColumn) return;
 
   if (chartType === "stacked") {
-    // para stacked exigimos columnas apiladas, no dataForChart
-    if (!stackedColumns.length) return;
+    if (inputMode === "raw") {
+      // En modo raw sí exigimos columnas apiladas
+      if (!stackedColumns.length) return;
+    } else {
+      // En modo summary pedimos que haya rangos definidos
+      if (!stackedRangesSummary.trim()) return;
+    }
   } else {
-    // para el resto, sí exigimos datos
+    // Para el resto de tipos exigimos datos calculados
     if (dataForChart.length === 0) return;
   }
 
@@ -494,7 +499,7 @@ const labelOrder = useMemo(
     stackedLabelCells,
     stackedRangesSummary,
     answerRange,
-    backgroundColor: previewBg, 
+    backgroundColor: previewBg,
     textColor: previewTextColor,
   });
 
