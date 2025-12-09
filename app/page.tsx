@@ -501,6 +501,7 @@ const labelOrder = useMemo(
     answerRange,
     backgroundColor: previewBg,
     textColor: previewTextColor,
+    secondAnswerRange, 
   });
 
   addChart({
