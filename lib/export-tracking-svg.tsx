@@ -338,10 +338,10 @@ export function buildTrackingSvg({
     marginBottom = 170;
   } else {
     // layout original 1920×1080
-    marginLeft = 90;
-    marginRight = 90;
-    marginTop = 80;
-    marginBottom = 80;
+    marginLeft = 120;
+    marginRight = 120;
+    marginTop = 125;
+    marginBottom = 125;
   }
 
   const titleY = marginTop + 130;
