@@ -31,7 +31,8 @@ export type ChartType =
   | "partido"
   | "tracking"
   | "stacked"
-  | "mediumdonut";
+  | "mediumdonut"
+  | "stackedvertical";
 
 export interface DatasetColumn {
   name: string;

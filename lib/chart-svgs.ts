@@ -8,6 +8,8 @@ import { buildPartidoSvg } from "@/lib/export-partido-svg";
 import { buildTrackingSvg } from "@/lib/export-tracking-svg";
 import { buildMediumDonutSvg } from "@/lib/export-mediumdonut-svg";
 import { buildStackedBarSvg, StackedRow, StackedSegment } from "@/lib/export-stackedbar-svg";
+import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
+
 
 export interface ChartSvgArgs {
   data: FrequencyData[];
@@ -397,4 +399,19 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       textColor: args.textColor,
     });
   },
+  stackedvertical: (args) =>
+    buildStackedVerticalSvg({
+      data: args.data,                 
+      title: args.title,
+      columns: args.columns ?? [],
+      customColors: args.customColors,
+      sheetTitle: args.sheetTitle,
+      width: args.width,
+      height: args.height,
+      inputMode: args.inputMode,
+      sheetValues: args.sheetValues,
+      answerRange: args.answerRange,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
+    }),
 };

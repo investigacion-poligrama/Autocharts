@@ -41,7 +41,7 @@ interface ChartTypeSelectorProps {
   onSecondQuestionCellChange: (value: string) => void;
   secondAnswerRange: string;
   onSecondAnswerRangeChange: (value: string) => void;
-  sheetValues: any[][];                         // ✅
+  sheetValues: any[][];                    
 }
 
 export function ChartTypeSelector({
@@ -56,17 +56,13 @@ export function ChartTypeSelector({
   onSecondQuestionCellChange,
   secondAnswerRange,
   onSecondAnswerRangeChange,
-  sheetValues,                                  // ✅ DES-ESTRUCTURADO
+  sheetValues,                                 
 }: ChartTypeSelectorProps) {
-  // solo lo usamos aquí para saber cuál de los dos campos estamos editando
   type SecondRangeTarget = "secondQuestion" | "secondAnswer";
   const [secondRangeTarget, setSecondRangeTarget] =
     useState<SecondRangeTarget | null>(null);
-
-  // si quieres que donut también pida segunda pregunta, métele "donut" aquí
   const needsSecondColumn =
     chartType === "matrix" || chartType === "mediumdonut";
-    // o:  chartType === "matrix" || chartType === "mediumdonut" || chartType === "donut";
 
   return (
     <Card>
@@ -176,6 +172,16 @@ export function ChartTypeSelector({
             <div className="flex items-center gap-2">
               <Grid3x3 className="h-4 w-4" />
               Matrix
+            </div>
+          </Button>
+          <Button
+            variant={chartType === "stackedvertical" ? "default" : "outline"}
+            onClick={() => onSelect("stackedvertical")}
+            className="flex-1"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Stacked vertical
             </div>
           </Button>
         </div>
