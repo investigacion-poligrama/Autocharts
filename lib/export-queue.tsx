@@ -15,7 +15,7 @@ type ExportQueueContextValue = {
 
 const ExportQueueContext = createContext<ExportQueueContextValue | null>(null);
 
-const STORAGE_KEY = "poligrama-export-queue-v1";
+const STORAGE_KEY = "poligrama-export-queue-v2"; 
 const TTL_MS = 60 * 60 * 1000; // 1 hora
 
 function loadFromStorage(): SavedChart[] {

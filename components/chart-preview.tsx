@@ -7,6 +7,7 @@ import type { ChartType, FrequencyData, DatasetColumn } from "@/app/page";
 import PreviewFrame from "@/components/ui/preview-frame";
 import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
+import type { Brand } from "@/types/brand";
 
 interface ChartPreviewProps {
   chartType: ChartType;
@@ -30,6 +31,7 @@ interface ChartPreviewProps {
   stackedRangesSummary?: string;
   answerRange?: string;
   previewBg: string;
+  brand?: Brand;
   previewTextColor: string;
     
 }
@@ -57,7 +59,7 @@ export default function ChartPreview({
   answerRange,
   previewBg,
   previewTextColor,
-
+  brand
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,7 @@ export default function ChartPreview({
       answerRange,
       backgroundColor: previewBg,
       textColor: previewTextColor,
+      brand: brand ?? "poligrama",
     });
 
     setSvgMarkup(svg);
@@ -113,6 +116,7 @@ export default function ChartPreview({
     answerRange,
     previewBg,
     previewTextColor,
+    brand,
   ]);
 
   const handleExport = () => {
@@ -143,6 +147,7 @@ export default function ChartPreview({
         textColor: previewTextColor,
         sheetValues,
         secondAnswerRange,
+        brand: brand ?? "poligrama", 
       });
 
       const blob = new Blob([svg], {

@@ -27,7 +27,9 @@ import {
 } from "lucide-react";
 import type { ChartType, DatasetColumn } from "@/app/page";
 import { Input } from "@/components/ui/input";
-import { RangePicker } from "@/components/ui/range-picker"; // ruta igual que en ColumnSelector
+import { RangePicker } from "@/components/ui/range-picker"; 
+import type { Brand } from "@/types/brand";
+
 
 interface ChartTypeSelectorProps {
   chartType: ChartType;
@@ -41,7 +43,8 @@ interface ChartTypeSelectorProps {
   onSecondQuestionCellChange: (value: string) => void;
   secondAnswerRange: string;
   onSecondAnswerRangeChange: (value: string) => void;
-  sheetValues: any[][];                    
+  sheetValues: any[][];
+  brand: Brand;                     
 }
 
 export function ChartTypeSelector({
@@ -56,9 +59,13 @@ export function ChartTypeSelector({
   onSecondQuestionCellChange,
   secondAnswerRange,
   onSecondAnswerRangeChange,
-  sheetValues,                                 
+  sheetValues,
+  brand                                 
 }: ChartTypeSelectorProps) {
   type SecondRangeTarget = "secondQuestion" | "secondAnswer";
+  const isPoligrama = brand === "poligrama";
+  const isCens = brand === "censEdmundSinsa";
+  const isDeskover = brand === "deskover";
   const [secondRangeTarget, setSecondRangeTarget] =
     useState<SecondRangeTarget | null>(null);
   const needsSecondColumn =
@@ -74,117 +81,165 @@ export function ChartTypeSelector({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-5 gap-2">
-          {/* botones de tipo de gráfica */}
-          <Button
-            variant={chartType === "partido" ? "default" : "outline"}
-            onClick={() => onSelect("partido")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Partido
-            </div>
-          </Button>
+                <div className="grid grid-cols-5 gap-2">
+          {/* ==== POLIGRAMA ==== */}
+          {isPoligrama && (
+            <>
+              <Button
+                variant={chartType === "partido" ? "default" : "outline"}
+                onClick={() => onSelect("partido")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Partido
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "tracking" ? "default" : "outline"}
-            onClick={() => onSelect("tracking")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Tracking
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "tracking" ? "default" : "outline"}
+                onClick={() => onSelect("tracking")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Tracking
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "mediumdonut" ? "default" : "outline"}
-            onClick={() => onSelect("mediumdonut")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4" />
-              Medium Donut
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "mediumdonut" ? "default" : "outline"}
+                onClick={() => onSelect("mediumdonut")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <PieChart className="h-4 w-4" />
+                  Medium Donut
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "donut" ? "default" : "outline"}
-            onClick={() => onSelect("donut")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4" />
-              Donut
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "donut" ? "default" : "outline"}
+                onClick={() => onSelect("donut")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <PieChart className="h-4 w-4" />
+                  Donut
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "bar" ? "default" : "outline"}
-            onClick={() => onSelect("bar")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Bar
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "bar" ? "default" : "outline"}
+                onClick={() => onSelect("bar")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Bar
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "stacked" ? "default" : "outline"}
-            onClick={() => onSelect("stacked")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Stacked
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "stacked" ? "default" : "outline"}
+                onClick={() => onSelect("stacked")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Stacked
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "score" ? "default" : "outline"}
-            onClick={() => onSelect("score")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Score
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "score" ? "default" : "outline"}
+                onClick={() => onSelect("score")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Score
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "approval" ? "default" : "outline"}
-            onClick={() => onSelect("approval")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <ThumbsUp className="h-4 w-4" />
-              Approval
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "approval" ? "default" : "outline"}
+                onClick={() => onSelect("approval")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <ThumbsUp className="h-4 w-4" />
+                  Approval
+                </div>
+              </Button>
 
-          <Button
-            variant={chartType === "matrix" ? "default" : "outline"}
-            onClick={() => onSelect("matrix")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <Grid3x3 className="h-4 w-4" />
-              Matrix
-            </div>
-          </Button>
-          <Button
-            variant={chartType === "stackedvertical" ? "default" : "outline"}
-            onClick={() => onSelect("stackedvertical")}
-            className="flex-1"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Stacked vertical
-            </div>
-          </Button>
+              <Button
+                variant={chartType === "matrix" ? "default" : "outline"}
+                onClick={() => onSelect("matrix")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <Grid3x3 className="h-4 w-4" />
+                  Matrix
+                </div>
+              </Button>
+              {/* 🔸 OJO: aquí ya NO mostramos stackedvertical para Poligrama */}
+            </>
+          )}
+
+          {/* ==== CENS / EDMUND / SINSA ==== */}
+          {isCens && (
+            <Button
+              variant={chartType === "stackedvertical" ? "default" : "outline"}
+              onClick={() => onSelect("stackedvertical")}
+              className="flex-1"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Stacked bar
+              </div>
+            </Button>
+          )}
+
+          {/* ==== DESKOVER ==== */}
+          {isDeskover && (
+            <>
+              <Button
+                variant={chartType === "bar" ? "default" : "outline"}
+                onClick={() => onSelect("bar")} // Horizontal bars (provisional)
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Horizontal bars
+                </div>
+              </Button>
+
+              <Button
+                variant={chartType === "donut" ? "default" : "outline"}
+                onClick={() => onSelect("donut")} // Donut (provisional)
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <PieChart className="h-4 w-4" />
+                  Donut
+                </div>
+              </Button>
+
+              <Button
+                variant={chartType === "stackedvertical" ? "default" : "outline"}
+                onClick={() => onSelect("stackedvertical")} // Vertical bar (provisional)
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Vertical bar
+                </div>
+              </Button>
+            </>
+          )}
         </div>
+
 
         {/* SEGUNDA PREGUNTA - modo BASE DE DATOS */}
         {needsSecondColumn && showMatrixOption && inputMode === "raw" && (

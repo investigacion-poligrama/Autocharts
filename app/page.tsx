@@ -21,6 +21,8 @@ import {
 } from "@/lib/frequencies";
 import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
+import type { Brand } from "@/types/brand";
+import { getBrandTheme } from "@/lib/brand-theme";
 
 export type ChartType =
   | "donut"
@@ -175,6 +177,13 @@ export default function Home() {
   const [secondAnswerRange, setSecondAnswerRange] = useState<string>("");
   const [stackedLabelCells, setStackedLabelCells] = useState<string>("");
   const [stackedRangesSummary, setStackedRangesSummary] = useState<string>("");
+  const [brand, setBrand] = useState<Brand | null>(null);
+  const handleBrandSelect = (b: Brand) => {
+  const theme = getBrandTheme(b);
+  setBrand(b);
+  setPreviewBg(theme.defaultBackground);
+  setPreviewTextColor(theme.defaultTextColor);
+};
 
   
  useEffect(() => {
@@ -502,7 +511,8 @@ const labelOrder = useMemo(
     answerRange,
     backgroundColor: previewBg,
     textColor: previewTextColor,
-    secondAnswerRange, 
+    secondAnswerRange,
+    brand: brand ?? "poligrama", 
   });
 
   addChart({
@@ -539,6 +549,42 @@ const canShowPreview = useMemo(() => {
   /* ------------------------------------------------------------------
    * Render
    * ------------------------------------------------------------------ */
+    if (!brand) {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-background">
+      <div className="max-w-md w-full space-y-6">
+        <h1 className="text-2xl font-semibold text-center">
+          ¿Con qué marca vas a trabajar?
+        </h1>
+
+        <div className="grid gap-4">
+          <Button
+            onClick={() => handleBrandSelect("poligrama")}
+            className="w-full"
+          >
+            Poligrama
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => handleBrandSelect("deskover")}
+            className="w-full"
+          >
+            Deskover
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => handleBrandSelect("censEdmundSinsa")}
+            className="w-full"
+          >
+            Cens / Edmund / Sinsa
+          </Button>
+        </div>
+      </div>
+    </main>
+  );
+}
 
   return (
     <main className="min-h-screen bg-background">
@@ -642,6 +688,7 @@ const canShowPreview = useMemo(() => {
                 secondAnswerRange={secondAnswerRange}             
                 onSecondAnswerRangeChange={setSecondAnswerRange}
                 sheetValues={sheetValues}
+                brand={brand ?? "poligrama"}  
               />
               </>
             )}
@@ -674,6 +721,7 @@ const canShowPreview = useMemo(() => {
             answerRange={answerRange}
             previewBg={previewBg}
             previewTextColor={previewTextColor}
+            brand={brand ?? "poligrama"}
           />
         )}
 

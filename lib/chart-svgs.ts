@@ -9,6 +9,7 @@ import { buildTrackingSvg } from "@/lib/export-tracking-svg";
 import { buildMediumDonutSvg } from "@/lib/export-mediumdonut-svg";
 import { buildStackedBarSvg, StackedRow, StackedSegment } from "@/lib/export-stackedbar-svg";
 import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
+import type { Brand } from "@/types/brand";
 
 
 export interface ChartSvgArgs {
@@ -30,7 +31,8 @@ export interface ChartSvgArgs {
   stackedRangesSummary?: string;
   answerRange?: string;
   backgroundColor?: string;
-  textColor?: string;      
+  textColor?: string;
+  brand?: Brand;       
 }
 
 /* ------------------------------------------------------------------ */
@@ -413,5 +415,6 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       answerRange: args.answerRange,
       backgroundColor: args.backgroundColor,
       textColor: args.textColor,
+      brand: args.brand, 
     }),
 };

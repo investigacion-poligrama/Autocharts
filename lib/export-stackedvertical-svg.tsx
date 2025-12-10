@@ -1,6 +1,9 @@
 import { ChartConfig } from "@/lib/chartconfig";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
 import type { DatasetColumn } from "@/app/page";
+import { getBrandTheme } from "@/lib/brand-theme";
+import { COOLVETICA_WOFF2_BASE64 } from "@/coolvetica.b64";
+
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
@@ -137,9 +140,7 @@ function extractTrackingData(columns: DatasetColumn[], mainColumnName: string) {
   const hasNumeric =
     !!valueCol &&
     valueCol.values.some(
-      (v) =>
-        v !== "" &&
-        !isNaN(Number(String(v).replace(",", ".")))
+      (v) => v !== "" && !isNaN(Number(String(v).replace(",", ".")))
     );
 
   const categories = problems.map((p) => ({
@@ -288,7 +289,7 @@ function colorForProblem(
 }
 
 /* ------------------------------------------------------------------ */
-/*   Builder principal: barras apiladas verticales por ola             */
+/*   Builder principal: barras apiladas verticales por ola            */
 /* ------------------------------------------------------------------ */
 
 export function buildStackedVerticalSvg({
@@ -304,20 +305,26 @@ export function buildStackedVerticalSvg({
   answerRange,
   backgroundColor,
   textColor,
+  brand,
 }: ChartSvgArgs): string {
+  const theme = getBrandTheme(brand ?? "poligrama");
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
-
-  const bg = backgroundColor ?? "#000000";
-  const mainTextColor = textColor ?? "#ffffff";
-  const mutedTextColor = textColor ?? "#bdbdbd";
+  const isCensBrand = brand === "censEdmundSinsa";
+  const FONT_STACK =
+    theme.fontFamily || "Helvetica, Arial, sans-serif";
+  const wantsCoolvetica = /coolvetica rg/i.test(theme.fontFamily);
+  const themeBg = theme.defaultBackground;
+  const themeText = theme.defaultTextColor;
+  const bg = backgroundColor ?? themeBg;
+  const mainTextColor = textColor ?? themeText;
+  const mutedTextColor = themeText === "#ffffff" ? "#bdbdbd" : themeText;
+  const footerText = theme.footer ?? ChartConfig.footer;
 
   const isTall1440 = W === 1440 && H === 1800;
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const footerFs = ChartConfig.typography.footer.fontSize;
-  const headerFs = 40;
-  const headerLine = headerFs * 1.1;
 
   // márgenes según preset
   let marginLeft: number;
@@ -337,18 +344,52 @@ export function buildStackedVerticalSvg({
     marginBottom = 125;
   }
 
+  const now = new Date();
+  const monthNamesEs = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ];
+  const monthName = monthNamesEs[now.getMonth()];
+  const monthLabel =
+    monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const headerDateLabel = `${monthLabel} ${now.getFullYear()}`;
   const titleY = marginTop + 130;
-  const maxTitleChars = isTall1440 ? 80 : 115;
+  const maxTitleChars = isTall1440 ? 43 : 115;
 
   const {
-    lines: titleLines,
-    fontSize: titleFs,
-    blockHeight: titleBlockH,
-  } = prepareTitle(title, baseTitleFs, maxTitleChars);
+  lines: titleLines,
+  fontSize: titleFs,
+  blockHeight: titleBlockH,
+} = prepareTitle(title, baseTitleFs, maxTitleChars);
 
-  const lineY = titleY + titleBlockH + 16;
+let lineY: number;
+let trackingLabelY = 0;
+let trackingLabelFs = 0;
 
-  // --- datos tracking (mismas funciones que export-tracking) ---
+if (isCensBrand) {
+  // tamaño grande tipo ejemplo de Juárez
+  trackingLabelFs = isTall1440 ? 75 : 60;
+
+  // un poco de espacio debajo de la pregunta
+  trackingLabelY = titleY + titleBlockH + 100;
+
+  // la línea verde va debajo de “Tracking”
+  lineY = trackingLabelY + 40;
+} else {
+  // resto de marcas: como antes
+  lineY = titleY + titleBlockH + 16;
+}
+
 
   let trackingData:
     | { months: string[]; categories: { name: string; values: number[] }[] }
@@ -421,69 +462,85 @@ export function buildStackedVerticalSvg({
   const yTicks = [0, 20, 40, 60, 80, 100];
 
   const parts: string[] = [];
-
   parts.push(
-    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    wantsCoolvetica
+      ? `<style type="text/css">
+  @font-face {
+    font-family: 'Coolvetica Rg';
+    src: url("data:font/woff2;base64,${COOLVETICA_WOFF2_BASE64}") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+  }
+</style>`
+      : "",
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // título
-  const titleLineGap = 6;
+  // título (pregunta)
+  const titleWeight = 600; 
+  const titleLineGapRender = 25;
   titleLines.forEach((line, idx) => {
-    const y = titleY + idx * (titleFs + titleLineGap);
+    const y = titleY + idx * (titleFs + titleLineGapRender);
     parts.push(
-      `<text x="${marginLeft}" y="${y}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${titleFs}">${esc(
-        line
-      )}</text>`
+      `<text
+         x="${marginLeft}"
+         y="${y}"
+         fill="${mainTextColor}"
+         font-family="${FONT_STACK}"
+         font-size="75"
+         font-weight="${titleWeight}"
+       >${esc(line)}</text>`
     );
   });
-
-  // línea horizontal
   parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${
-      W - marginRight
-    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
+    `<text
+       x="${marginLeft}"
+       y="${trackingLabelY}"
+       fill="${mainTextColor}"
+       font-family="${FONT_STACK}"
+       font-size="${trackingLabelFs}"
+       font-weight="700"
+     >Tracking</text>`
   );
 
-  // cabecera Poligrama / Poder. / Ganar.
-  const logoX = W - marginRight;
-  const logoY0 = marginTop - 24;
-
+    // HEADER
   if (sheetTitle) {
-    parts.push(
-      `<text x="${marginLeft}" y="${logoY0}"
-             fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
-        ${esc(sheetTitle)}
-       </text>`
-    );
-  }
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
-  );
+    const headerY = marginTop - 24;
+    const centerX = W / 2;
+    const rightX = W - marginRight;
+      parts.push(
+        `<text x="${marginLeft}" y="${headerY}"
+               fill="${mainTextColor}"
+               font-family="${FONT_STACK}"
+               font-size="26"
+               font-weight="600"
+               text-anchor="start">Monterrey, Nuevo León</text>`
+      );
+      parts.push(
+        `<text x="${centerX}" y="${headerY}"
+               fill="${mainTextColor}"
+               font-family="${FONT_STACK}"
+               font-size="30"
+               font-weight="600"
+               text-anchor="middle">${esc(sheetTitle)}</text>`
+      );
+      parts.push(
+        `<text x="${rightX}" y="${headerY}"
+               fill="${mainTextColor}"
+               font-family="${FONT_STACK}"
+               font-size="26"
+               font-weight="600"
+               text-anchor="end">${esc(headerDateLabel)}</text>`
+      );
+    }
+  
 
   // ---------- grid y eje Y 0–100 ----------
   yTicks.forEach((v) => {
     const t = v / yMax;
     const y = chartBottom - t * chartHeight;
-
-    parts.push(
-      `<line x1="${barsLeft}" y1="${y}" x2="${barsRight}" y2="${y}"
-             stroke="${ChartConfig.colors.neutral}" stroke-width="0.7" opacity="0.25" />`,
-      `<text x="${axisLeft}" y="${y + 4}" fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="20" text-anchor="end">${v}</text>`
-    );
   });
 
   // eje vertical
@@ -501,7 +558,7 @@ export function buildStackedVerticalSvg({
 
     let currentY = chartBottom; // va subiendo de abajo hacia arriba
 
-    categories.forEach((cat, cIdx) => {
+    categories.forEach((cat) => {
       const value = Math.max(0, Math.min(100, cat.values[mIdx] ?? 0));
       if (value <= 0) return;
 
@@ -512,29 +569,47 @@ export function buildStackedVerticalSvg({
       const color = colorForProblem(cat.name, customColors);
 
       // rectángulo del segmento
+            // rectángulo del segmento
       parts.push(
         `<rect x="${x}" y="${yTop}" width="${barWidth}" height="${h}"
                fill="${color}" />`
       );
 
-      // etiqueta de porcentaje dentro del segmento
-      if (h >= minSegmentPxForLabel) {
+      // etiquetas de porcentaje
+      if (isCensBrand) {
+        // 👉 Cens / Edmund / Sinsa: % a la derecha de la barra
+        const offset = 14; // separacion respecto al borde derecho de la barra
+        const textX = x + barWidth + offset;
+        const textY = yTop + h / 2 + 4;
+
+        parts.push(
+          `<text x="${textX}" y="${textY}"
+                 fill="${color}"
+                 font-family="${FONT_STACK}"
+                 font-size="18"
+                 font-weight="600"
+                 text-anchor="start"
+                 dominant-baseline="middle">${value}%</text>`
+        );
+      } else if (h >= minSegmentPxForLabel) {
+        // 👉 Resto de marcas: % dentro del segmento como antes
         const textX = cx;
         const textY = yTop + h / 2 + 4;
 
         parts.push(
           `<text x="${textX}" y="${textY}"
                  fill="#ffffff"
-                 font-family="Helvetica, Arial, sans-serif"
-                 font-size="18" font-weight="700"
-                 text-anchor="middle" dominant-baseline="middle">${value}%</text>`
+                 font-family="${FONT_STACK}"
+                 font-size="18"
+                 font-weight="700"
+                 text-anchor="middle"
+                 dominant-baseline="middle">${value}%</text>`
         );
       }
-
       currentY = yTop;
     });
 
-    // etiqueta del mes debajo de la barra (puede ser 1–2 líneas)
+    // etiqueta del mes debajo de la barra (1–2 líneas)
     const monthWords = String(month).split(/\s+/);
     let lines: string[] = [];
     let current = "";
@@ -558,7 +633,7 @@ export function buildStackedVerticalSvg({
     parts.push(
       `<text x="${cx}" y="${baseY}"
              fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
+             font-family="${FONT_STACK}"
              font-size="20"
              font-weight="700"
              text-anchor="middle">` +
@@ -574,20 +649,49 @@ export function buildStackedVerticalSvg({
     );
   });
 
-  // ---------- leyenda inferior (2 columnas) ----------
+   // ---------- leyenda inferior (2 columnas) ----------
   const legendTop = chartBottom + 110;
   const legendCols = 2;
   const legendItemHeight = 30;
   const legendGapY = 10;
-  const colWidth = (barsRight - barsLeft) / legendCols;
+
+  // Longitud máxima de label por columna
+  const colLabelMaxLens = new Array(legendCols).fill(0);
+  categories.forEach((cat, idx) => {
+    const colIdx = idx % legendCols;
+    const len = cat.name.length;
+    if (len > colLabelMaxLens[colIdx]) {
+      colLabelMaxLens[colIdx] = len;
+    }
+  });
+
+  const colTextWidths = colLabelMaxLens.map((len) => len * 10); 
+  const colWidths = colTextWidths.map((textW) => 18 + 10 + textW + 40);
+  // Área disponible entre márgenes
+  const legendAreaLeft = barsLeft;
+  const legendAreaRight = barsRight;
+  const legendAreaWidth = legendAreaRight - legendAreaLeft;
+
+  // Ancho total real del bloque de leyenda
+  const legendBlockWidth = colWidths.reduce((sum, w) => sum + w, 0);
+
+  // X inicial del bloque centrado
+  const legendLeft =
+    legendAreaLeft + (legendAreaWidth - legendBlockWidth) / 2;
+
+  // Offsets acumulados por columna
+  const colOffsets: number[] = [];
+  colWidths.reduce((acc, w, idx) => {
+    colOffsets[idx] = acc;
+    return acc + w;
+  }, 0);
 
   categories.forEach((cat, idx) => {
     const colIdx = idx % legendCols;
     const rowIdx = Math.floor(idx / legendCols);
 
-    const baseX = barsLeft + colIdx * colWidth;
-    const y =
-      legendTop + rowIdx * (legendItemHeight + legendGapY);
+    const baseX = legendLeft + colOffsets[colIdx];
+    const y = legendTop + rowIdx * (legendItemHeight + legendGapY);
 
     const color = colorForProblem(cat.name, customColors);
 
@@ -603,18 +707,14 @@ export function buildStackedVerticalSvg({
              fill="${color}" />`,
       `<text x="${textX}" y="${textY}"
              fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
+             font-family="${FONT_STACK}"
              font-size="18"
              text-anchor="start">${esc(cat.name)}</text>`
     );
   });
 
+
   // footer
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
-      ChartConfig.footer
-    )}</text>`
-  );
 
   parts.push(`</svg>`);
 
