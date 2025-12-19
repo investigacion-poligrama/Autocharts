@@ -33,7 +33,6 @@ interface ChartPreviewProps {
   previewBg: string;
   brand?: Brand;
   previewTextColor: string;
-    
 }
 
 export default function ChartPreview({
@@ -59,12 +58,15 @@ export default function ChartPreview({
   answerRange,
   previewBg,
   previewTextColor,
-  brand
+  brand,
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgMarkup, setSvgMarkup] = useState<string>("");
   const { addChart } = useExportQueue(); // si no lo usas luego lo quitas
+
+  // ✅ aquí debe vivir isCens (no dentro de handleExport)
+  const isCens = brand === "censEdmundSinsa";
 
   useEffect(() => {
     const builder = chartSvgBuilders[chartType];
@@ -147,7 +149,7 @@ export default function ChartPreview({
         textColor: previewTextColor,
         sheetValues,
         secondAnswerRange,
-        brand: brand ?? "poligrama", 
+        brand: brand ?? "poligrama",
       });
 
       const blob = new Blob([svg], {
@@ -205,27 +207,29 @@ export default function ChartPreview({
 
       {/* PREVIEW */}
       <div className="px-6 pb-6 md:mx-[-24px]">
-        <PreviewFrame title={title} legend={undefined} contentRef={containerRef}>
+        <PreviewFrame
+          title={title}
+          legend={undefined}
+          contentRef={containerRef}
+          // ✅ solo Cens cambia ratio/alto. Poligrama queda EXACTAMENTE igual.
+          aspectRatio={isCens ? `${canvasWidth} / ${canvasHeight}` : undefined}
+          minHeight={isCens ? 900 : undefined}
+        >
           <div
             ref={containerRef}
-            className="h-full w-full"
-            style={{
-              background: previewBg,
-              color: previewTextColor,
-              minHeight: 0,
-              minWidth: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-              aspectRatio: `${canvasWidth}/${canvasHeight}`,
-            }}
+            className="w-full h-full flex items-center justify-center"
+            style={{ color: previewTextColor }}
           >
             {svgMarkup && (
               <div
-                className="h-full w-full"
-                style={{ minHeight: 0, minWidth: 0 }}
-                dangerouslySetInnerHTML={{ __html: svgMarkup }}
+                className="w-full h-full"
+                style={{ minWidth: 0, minHeight: 0 }}
+                dangerouslySetInnerHTML={{
+                  __html: svgMarkup.replace(
+                    /<svg\b([^>]*)>/,
+                    `<svg$1 width="100%" height="100%" preserveAspectRatio="xMidYMid meet">`
+                  ),
+                }}
               />
             )}
           </div>

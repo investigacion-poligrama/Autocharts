@@ -10,6 +10,8 @@ import { buildMediumDonutSvg } from "@/lib/export-mediumdonut-svg";
 import { buildStackedBarSvg, StackedRow, StackedSegment } from "@/lib/export-stackedbar-svg";
 import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
 import type { Brand } from "@/types/brand";
+import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
+import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
 
 
 export interface ChartSvgArgs {
@@ -403,6 +405,34 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
   },
   stackedvertical: (args) =>
     buildStackedVerticalSvg({
+      data: args.data,                 
+      title: args.title,
+      columns: args.columns ?? [],
+      customColors: args.customColors,
+      sheetTitle: args.sheetTitle,
+      width: args.width,
+      height: args.height,
+      inputMode: args.inputMode,
+      sheetValues: args.sheetValues,
+      answerRange: args.answerRange,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
+      brand: args.brand, 
+    }),
+    barnarrow: (args) =>
+  buildBarNarrowSvg({
+    data: args.data,
+    title: args.title,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+    brand: args.brand,
+    headerLeftLabel: "Monterrey, Nuevo León", 
+  }),
+  singletrack: (args) =>
+    buildScoreTrackingCensSvg({
       data: args.data,                 
       title: args.title,
       columns: args.columns ?? [],

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import type { Brand } from "@/types/brand";
 
 type InputMode = "raw" | "summary";
 type CanvasPreset = "1920x1080" | "1440x1800";
@@ -28,6 +29,7 @@ interface DatasetInputProps {
   onPreviewTextColorChange: (c: string) => void;
   previewBg: string;
   previewTextColor: string;
+  brand: Brand
 }
 
 export function DatasetInput({
@@ -42,6 +44,7 @@ export function DatasetInput({
   onPreviewTextColorChange,
   previewBg,
   previewTextColor,
+  brand,
 }: DatasetInputProps) {
   const [url, setUrl] = useState("");
 
@@ -88,25 +91,27 @@ export function DatasetInput({
             Tabla de resultados
           </Button>
         </div>
-        {/* 🔹 nuevo toggle de tamaño */}
-        <div className="mt-3 inline-flex gap-2 text-xs">
-          <Button
-            type="button"
-            size="sm"
-            variant={is1920 ? "default" : "outline"}
-            onClick={() => onCanvasPresetChange("1920x1080")}
-          >
-            1920 × 1080 px
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={is1440 ? "default" : "outline"}
-            onClick={() => onCanvasPresetChange("1440x1800")}
-          >
-            1440 × 1800 px
-          </Button>
-        </div>
+        {/* 🔹 toggle de tamaño (oculto para Cens/Edmund/Sinsa) */}
+{brand !== "censEdmundSinsa" && (
+  <div className="mt-3 inline-flex gap-2 text-xs">
+    <Button
+      type="button"
+      size="sm"
+      variant={is1920 ? "default" : "outline"}
+      onClick={() => onCanvasPresetChange("1920x1080")}
+    >
+      1920 × 1080 px
+    </Button>
+    <Button
+      type="button"
+      size="sm"
+      variant={is1440 ? "default" : "outline"}
+      onClick={() => onCanvasPresetChange("1440x1800")}
+    >
+      1440 × 1800 px
+    </Button>
+  </div>
+)}
         {/* 🔹 Selector de colores del preview */}
 <div className="mt-3 inline-flex gap-2 text-xs items-center">
   <label className="text-foreground">Fondo</label>

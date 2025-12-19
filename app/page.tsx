@@ -34,7 +34,9 @@ export type ChartType =
   | "tracking"
   | "stacked"
   | "mediumdonut"
-  | "stackedvertical";
+  | "barnarrow"
+  | "stackedvertical"
+  | "singletrack";
 
 export interface DatasetColumn {
   name: string;
@@ -79,6 +81,48 @@ function parseA1Range(range: string) {
     colStart: Math.min(start.col, end.col),
     colEnd: Math.max(start.col, end.col),
   };
+}
+function buildSingleTrackFromRange(values: any[][], range: string): FrequencyData[] {
+  const trimmed = range.trim();
+  if (!trimmed) return [];
+
+  let parsed;
+  try {
+    parsed = parseA1Range(trimmed);
+  } catch {
+    return [];
+  }
+
+  const { rowStart, colStart, colEnd } = parsed;
+
+  // fila 1 del rango: headers (meses) empezando en colStart+1
+  const headerRow = values[rowStart - 1] || [];
+  // fila 2 del rango: valores (números) empezando en colStart+1
+  const valueRow = values[rowStart] || [];
+
+  const out: FrequencyData[] = [];
+
+  for (let c = colStart + 1; c <= colEnd; c++) {
+    const rawMonth = headerRow[c - 1];
+    const rawVal = valueRow[c - 1];
+
+    const label = rawMonth != null ? String(rawMonth).trim() : "";
+    if (!label) continue;
+
+    let v = 0;
+    if (typeof rawVal === "number") v = rawVal;
+    else if (typeof rawVal === "string") {
+      const cleaned = rawVal.replace("%", "").replace(",", ".").trim();
+      const num = parseFloat(cleaned);
+      if (!Number.isNaN(num)) v = num;
+    }
+
+    const rounded = Number(v.toFixed(1));
+
+    out.push({ label, value: rounded, percentage: rounded });
+  }
+
+  return out;
 }
 
 function buildSummaryFrequenciesFromRange(
@@ -384,10 +428,11 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
       return;
     }
 
-    let freqs: FrequencyData[] = buildSummaryFrequenciesFromRange(
-      sheetValues,
-      answerRange
-    );
+    let freqs: FrequencyData[] =
+  chartType === "singletrack"
+    ? buildSingleTrackFromRange(sheetValues, answerRange)
+    : buildSummaryFrequenciesFromRange(sheetValues, answerRange);
+
 
     if (chartType === "tracking") {
       const seen = new Set<string>();
@@ -427,8 +472,8 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
   if (inputMode === "summary") {
     return remaining.map((f) => ({
       ...f,
-      percentage: Number(f.percentage.toFixed(1)), // 40.65 -> 40.7
-      value: f.value, // mantenemos el valor original por si lo usas
+      percentage: Number(f.percentage.toFixed(1)), 
+      value: f.value, 
     }));
   }
 
@@ -613,6 +658,7 @@ const canShowPreview = useMemo(() => {
               previewTextColor={previewTextColor}
               onPreviewBgChange={setPreviewBg}
               onPreviewTextColorChange={setPreviewTextColor}
+              brand={brand ?? "poligrama"}
 
             />
 

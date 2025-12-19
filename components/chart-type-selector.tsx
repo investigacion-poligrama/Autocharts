@@ -183,12 +183,12 @@ export function ChartTypeSelector({
                   Matrix
                 </div>
               </Button>
-              {/* 🔸 OJO: aquí ya NO mostramos stackedvertical para Poligrama */}
             </>
           )}
 
           {/* ==== CENS / EDMUND / SINSA ==== */}
           {isCens && (
+            <>
             <Button
               variant={chartType === "stackedvertical" ? "default" : "outline"}
               onClick={() => onSelect("stackedvertical")}
@@ -199,6 +199,29 @@ export function ChartTypeSelector({
                 Stacked bar
               </div>
             </Button>
+
+            <Button
+              variant={chartType === "barnarrow" ? "default" : "outline"}
+              onClick={() => onSelect("barnarrow")}
+              className="flex-1"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Narrow Bar
+              </div>
+            </Button>
+
+            <Button
+              variant={chartType === "singletrack" ? "default" : "outline"}
+              onClick={() => onSelect("singletrack")}
+              className="flex-1"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Single Track
+              </div>
+            </Button>
+             </>
           )}
 
           {/* ==== DESKOVER ==== */}

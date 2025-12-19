@@ -8,19 +8,22 @@ export type PreviewFrameProps = {
   legend?: ReactNode;
   contentRef?: RefObject<HTMLDivElement | null>;
   children: ReactNode;
+  aspectRatio?: string;
+  minHeight?: number;
 };
 
 export default function PreviewFrame({
   legend,
   contentRef,
   children,
+  aspectRatio = "16 / 9",
+  minHeight = 680,
 }: PreviewFrameProps) {
   return (
     <div
       className="relative rounded-xl shadow-sm bg-black overflow-visible"
-      style={{ aspectRatio: "16 / 9", minHeight: 680 }}
+      style={{ aspectRatio, minHeight }}
     >
-      {}
       <div
         ref={contentRef as RefObject<HTMLDivElement> | undefined}
         className="absolute inset-0 p-4 sm:p-5 overflow-visible grid"
@@ -29,7 +32,6 @@ export default function PreviewFrame({
           rowGap: legend ? 16 : 0,
         }}
       >
-        {/* STAGE */}
         <div
           className="chart-stage bg-black rounded-lg"
           style={{
@@ -43,14 +45,10 @@ export default function PreviewFrame({
           <div className="h-full w-full min-w-0 min-h-0">{children}</div>
         </div>
 
-        {/* LEYENDA (opcional) */}
         {legend ? (
           <div
             className="legend-container"
-            style={{
-              overflow: "visible",
-              color: ChartConfig.colors.white,
-            }}
+            style={{ overflow: "visible", color: ChartConfig.colors.white }}
           >
             {legend}
           </div>
