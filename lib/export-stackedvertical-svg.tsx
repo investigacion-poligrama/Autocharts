@@ -324,12 +324,12 @@ export function buildStackedVerticalSvg({
 
   const titleY = marginTop + S(130);
 
-  const baseTitleFs = isCensBrand ? S(50) : ChartConfig.typography.title.fontSize;
+  const baseTitleFs = isCensBrand ? S(75) : ChartConfig.typography.title.fontSize;
   const maxTitleChars = isTall1440 ? 43 : 80;
   const maxTitleCharsUsed = isCensBrand ? 43 : maxTitleChars;
 
  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
-  prepareTitle(title, baseTitleFs, 54, 3);
+  prepareTitle(title, baseTitleFs, 30, 3);
 
 
   let trackingLabelY = 0;
@@ -380,13 +380,13 @@ export function buildStackedVerticalSvg({
   const barsRight = W - marginRight;
   const barsWidth = barsRight - barsLeft;
 
-  const chartTop = lineY + S(80);
-  const chartBottom = H - marginBottom - S(220);
+  const chartTop = lineY + S(50);
+  const chartBottom = H - marginBottom - S(400);
   const chartHeight = chartBottom - chartTop;
 
   const monthsCount = months.length;
   const barSlot = monthsCount > 0 ? barsWidth / monthsCount : 0;
-  const barWidth = barSlot * (isCensBrand ? 0.44 : 0.36);
+  const barWidth = barSlot * (isCensBrand ? 0.18 : 0.22);
 
   const yMax = 100;
 
@@ -578,13 +578,13 @@ yTicks.forEach((v) => {
     );
   });
 
-  const legendTop = chartBottom + S(90);
+  const legendTop = chartBottom + S(110);
   const legendCols = 2;
-  const legendItemHeight = S(18);
-  const legendGapY = S(8);
+  const legendItemHeight = S(24);
+  const legendGapY = S(20);
 
-  const squareSize = S(10);
-  const legendFontSize = isCensBrand ? S(20) : 20;
+  const squareSize = S(25);
+  const legendFontSize = isCensBrand ? S(34) : 20;
 
   const colLabelMaxLens = new Array(legendCols).fill(0);
   categories.forEach((cat, idx) => {

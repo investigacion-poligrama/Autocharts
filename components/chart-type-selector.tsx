@@ -221,6 +221,16 @@ export function ChartTypeSelector({
                 Single Track
               </div>
             </Button>
+            <Button
+              variant={chartType === "narrowvertbars" ? "default" : "outline"}
+              onClick={() => onSelect("narrowvertbars")}
+              className="flex-1"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Vert Bars
+              </div>
+            </Button>
              </>
           )}
 

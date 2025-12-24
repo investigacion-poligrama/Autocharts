@@ -266,9 +266,9 @@ const headerY = marginTop - S(24);
 
   const titleY = marginTop + S(130);
 
-const baseTitleFs = S(50);
+const baseTitleFs = S(75);
 const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
-  prepareTitle(title, baseTitleFs, 54, 3);
+  prepareTitle(title, baseTitleFs, 30, 5);
 
 
 
@@ -313,8 +313,8 @@ const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
   const lastValue = values[lastIdx] ?? 0;
 
   // --- Layout: Score arriba ---
-  const scoreAreaTop = titleY + titleBlockH + 40;
-  const scoreBarY = scoreAreaTop + 120;
+  const scoreAreaTop = titleY + titleBlockH + 55;
+  const scoreBarY = scoreAreaTop + 0;
   const scoreBarX = marginLeft;
   const scoreBarW = W - marginLeft - marginRight;
   const scoreBarH = 32;
@@ -329,20 +329,20 @@ const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
   const bigValueY = scoreBarY - 22;
 
   // --- Layout: Tracking abajo ---
-  const trackingLabelY = scoreBarY + 140;
+  const trackingLabelY = scoreBarY + 100;
 
-  const chartTop = trackingLabelY + 46;
+  const chartTop = trackingLabelY + 45 ;
   const chartBottom = H - marginBottom - 10;
   const chartHeight = Math.max(1, chartBottom - chartTop);
 
   const axisX = marginLeft;
   const barsLeft = axisX + 34;
-  const barsRight = W - marginRight;
-  const barsW = barsRight - barsLeft;
+  const barsRight = W - marginRight-70;
+  const barsW = barsRight - barsLeft - 185;
 
   const nMonths = months.length;
   const slot = nMonths > 0 ? barsW / nMonths : 0;
-  const barW = slot * 0.28;
+  const barW = slot * 0.2;
 
   const yTicks = [0, 2, 4, 6, 8, 10];
 
@@ -419,7 +419,7 @@ const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
 
     parts.push(
       `<rect x="${x}" y="${yTop}" width="${barW}" height="${h}" fill="${mainTextColor}" fill-opacity="0.85" />`,
-      `<text x="${cx}" y="${yTop - 6}" fill="${mainTextColor}" font-family="${FONT_STACK}" font-size="14" font-weight="800" text-anchor="middle">${esc(v.toFixed(1).replace(/\.0$/, ""))}</text>`,
+      `<text x="${cx}" y="${yTop - 6}" fill="${mainTextColor}" font-family="${FONT_STACK}" font-size="25" font-weight="800" text-anchor="middle">${esc(v.toFixed(1).replace(/\.0$/, ""))}</text>`,
       `<text x="${cx}" y="${chartBottom + 26}" fill="${mainTextColor}" font-family="${FONT_STACK}" font-size="12" font-weight="800" text-anchor="middle">${esc(monthShort(months[i]))}</text>`
     );
   }

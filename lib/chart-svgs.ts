@@ -12,6 +12,7 @@ import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
 import type { Brand } from "@/types/brand";
 import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
 import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
+import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
 
 
 export interface ChartSvgArgs {
@@ -446,5 +447,17 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       backgroundColor: args.backgroundColor,
       textColor: args.textColor,
       brand: args.brand, 
+    }),
+    narrowvertbars: (args) =>
+    buildNarrowVertBarsSvg({
+      data: args.data,
+      title: args.title,
+      sheetTitle: args.sheetTitle,
+      width: args.width,
+      height: args.height,
+      backgroundColor: args.backgroundColor,
+      textColor: args.textColor,
+      brand: args.brand,
+      headerLeftLabel: "Monterrey, Nuevo León", 
     }),
 };

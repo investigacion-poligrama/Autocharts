@@ -1,4 +1,3 @@
-import { ChartConfig } from "@/lib/chartconfig";
 import type { FrequencyData } from "@/app/page";
 import { getBrandTheme } from "@/lib/brand-theme";
 import { COOLVETICA_WOFF2_BASE64 } from "@/coolvetica.b64";
@@ -10,7 +9,9 @@ const esc = (s: string) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-type BuildBarNarrowSvgArgs = {
+type WrappedTitle = { lines: string[]; fontSize: number; blockHeight: number };
+
+type BuildNarrowVertBarsSvgArgs = {
   data: FrequencyData[];
   title: string;
   sheetTitle?: string;
@@ -22,17 +23,11 @@ type BuildBarNarrowSvgArgs = {
   headerLeftLabel?: string;
 };
 
-type WrappedTitle = {
-  lines: string[];
-  fontSize: number;
-  blockHeight: number;
-};
-
 function prepareTitle(
   title: string,
   baseFontSize: number,
-  maxChars = 55,
-  maxLines = 3
+  maxChars = 40,
+  maxLines = 4
 ): WrappedTitle {
   const words = String(title || "").trim().split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -70,8 +65,9 @@ function prepareTitle(
     truncated = true;
   }
 
+  // ✅ Solo agrega … si de verdad se truncó
   if (truncated && lines.length) {
-    lines[lines.length - 1] = lines[lines.length - 1].replace(/\.*$/, "") + "…";
+    lines[lines.length - 1] = lines[lines.length - 1].replace(/[.…]+$/, "") + "…";
   }
 
   const fs = baseFontSize;
@@ -83,25 +79,44 @@ function prepareTitle(
 
 function monthLabelEs(d: Date) {
   const monthNamesEs = [
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
+    "enero","febrero","marzo","abril","mayo","junio",
+    "julio","agosto","septiembre","octubre","noviembre","diciembre",
   ];
   const m = monthNamesEs[d.getMonth()];
-  const M = m.charAt(0).toUpperCase() + m.slice(1);
-  return `${M} ${d.getFullYear()}`;
+  return `${m.charAt(0).toUpperCase() + m.slice(1)} ${d.getFullYear()}`;
 }
 
-export function buildBarNarrowSvg({
+// Etiqueta tipo “Muy buenas” => 2 líneas si está larga
+function wrapLabel(label: string, maxChars = 10, maxLines = 2): string[] {
+  const words = String(label || "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const lines: string[] = [];
+  let cur = "";
+
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w;
+    if (test.length <= maxChars) {
+      cur = test;
+      continue;
+    }
+    if (cur) lines.push(cur);
+    cur = w;
+
+    if (lines.length === maxLines - 1) break;
+  }
+  if (cur && lines.length < maxLines) lines.push(cur);
+
+  // si aún se pasa, recorta la última
+  if (lines.length) {
+    const last = lines[lines.length - 1];
+    if (last.length > maxChars) lines[lines.length - 1] = last.slice(0, Math.max(1, maxChars - 1)) + "…";
+  }
+
+  return lines.slice(0, maxLines);
+}
+
+export function buildNarrowVertBarsSvg({
   data,
   title,
   sheetTitle,
@@ -111,12 +126,15 @@ export function buildBarNarrowSvg({
   textColor,
   brand,
   headerLeftLabel = "Monterrey, Nuevo León",
-}: BuildBarNarrowSvgArgs): string {
+}: BuildNarrowVertBarsSvgArgs): string {
   const theme = getBrandTheme(brand ?? "poligrama");
   const isCensBrand = brand === "censEdmundSinsa";
 
+  // ✅ misma idea que tus otros exports
   const W = isCensBrand ? 612 : width ?? 1920;
   const H = isCensBrand ? 792 : height ?? 1080;
+
+  // Para Cens usamos reglas “tall” escaladas desde 1440x1800
   const BASE_W = 1440;
   const BASE_H = 1800;
   const scale = isCensBrand ? Math.min(W / BASE_W, H / BASE_H) : 1;
@@ -127,36 +145,32 @@ export function buildBarNarrowSvg({
 
   const bg = backgroundColor ?? theme.defaultBackground;
   const mainTextColor = textColor ?? theme.defaultTextColor;
+
   const useTallRules = isCensBrand || (W === 1440 && H === 1800);
 
-  let marginLeft = useTallRules ? S(100) : 120;
-  let marginRight = useTallRules ? S(100) : 120;
-  let marginTop = useTallRules ? S(170) : 125;
-  let marginBottom = useTallRules ? S(170) : 125;
+  const marginLeft = useTallRules ? S(100) : 120;
+  const marginRight = useTallRules ? S(100) : 120;
+  const marginTop = useTallRules ? S(170) : 125;
+  const marginBottom = useTallRules ? S(170) : 125;
 
-  // --- título ---
-  const baseTitleFs = useTallRules ? S(75) : 75;
-  const maxTitleChars = useTallRules ? 34 : 50;
-  const titleY = marginTop + S(130);
-
-  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
-  prepareTitle(title, baseTitleFs, 30, 4);
-
-
-  const titleLineGapRender = useTallRules ? S(22) : 22;
-  const titleWeight = 600;
-
-  // --- header ---
+  // Header
   const headerY = marginTop - S(24);
   const centerX = W / 2;
   const rightX = W - marginRight;
   const headerDateLabel = monthLabelEs(new Date());
 
-  // --- layout de líneas ---
-  const listTop = titleY + titleBlockH + S(120);
-  const listBottom = H - marginBottom - S(120);
-  const listHeight = Math.max(1, listBottom - listTop);
+  // Title
+  const titleY = marginTop + S(130);
+  const baseTitleFs = useTallRules ? S(75) : 75; // como referencia, “título grande”
+  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } = prepareTitle(
+    title,
+    useTallRules ? S(75) : 75,
+    useTallRules ? 30 : 44,
+    4
+  );
+  const titleLineGapRender = useTallRules ? S(22) : 22;
 
+  // Datos
   const items = (data || [])
     .map((d) => {
       const raw =
@@ -166,9 +180,9 @@ export function buildBarNarrowSvg({
           ? d.value
           : 0;
       const value = Math.max(0, Math.min(100, raw));
-      return { label: String(d.label ?? ""), value };
+      return { label: String(d.label ?? "").trim(), value };
     })
-    .filter((x) => x.label.trim() !== "");
+    .filter((x) => x.label);
 
   if (!items.length) {
     return [
@@ -182,29 +196,34 @@ export function buildBarNarrowSvg({
     ].join("\n");
   }
 
-  const linesLeft = marginLeft + (useTallRules ? S(40) : 60);
+  // ---- Área de barras (vertical) ----
+  // Diseño “tipo foto”: mucho aire arriba y barras “desde el baseline”
+  const barsTop = titleY + titleBlockH + S(0);
+  const barsBottom = H - marginBottom - S(400); // deja espacio para labels de abajo
+  const barsH = Math.max(1, barsBottom - barsTop);
 
-  // ✅ antes: -420 y 0.62 (pensado para 1440/1920)
-  // ahora: lo escalamos y además lo “clamp” para que nunca quede negativo
-  const proposedRight = W - marginRight - S(420);
-  const pctRight = W * 0.62;
-  const linesRight = Math.max(linesLeft + S(200), Math.min(proposedRight, pctRight));
-  const maxLineWidth = Math.max(S(200), linesRight - linesLeft);
+  // Baseline (donde “nacen” las barras)
+  const baselineY = barsBottom;
 
-  const rows = items.length;
-  const baseRowGap = rows <= 1 ? 0 : listHeight / (rows - 1);
-  const rowGap = useTallRules ? baseRowGap : baseRowGap * 1.3;
+  // Ancho util
+  const plotLeft = marginLeft + S(20);
+  const plotRight = W - marginRight - S(20);
+  const plotW = Math.max(1, plotRight - plotLeft);
 
-  const strokeW = useTallRules ? S(6) : 4;
-  const pctFs = useTallRules ? S(45) : 26;
-  const labelFs = useTallRules ? S(37) : 20;
-  const labelWeight = 600;
+  // Barras “narrow”
+  const n = items.length;
+  const slot = plotW / n;
 
-  const pctDy = useTallRules ? -S(10) : -10;
-  const labelDy = useTallRules ? S(18) : 18;
+  // muy angosta como referencia del PDF
+  const barW = Math.max(S(10), Math.min(S(18), slot * 0.18));
+  const pctFs = useTallRules ? S(34) : 34;
+  const labelFs = useTallRules ? S(24) : 24;
+
+  // separación % arriba y label abajo
+  const pctGap = S(12);
+  const labelGap = S(28);
 
   const parts: string[] = [];
-
   parts.push(
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
@@ -244,47 +263,64 @@ export function buildBarNarrowSvg({
 
   // TITLE
   titleLines.forEach((line, idx) => {
-    const y = titleY + idx * (baseTitleFs + titleLineGapRender);
+    const y = titleY + idx * (titleFs + titleLineGapRender);
     parts.push(
       `<text x="${marginLeft}" y="${y}"
              fill="${mainTextColor}"
              font-family="${FONT_STACK}"
-             font-size="${baseTitleFs}"
-             font-weight="${titleWeight}"
+             font-size="${titleFs}"
+             font-weight="600"
              text-anchor="start">${esc(line)}</text>`
     );
   });
 
-  // LIST
-  items.forEach((it, i) => {
-    const y = listTop + i * rowGap;
-    const lineLen = (maxLineWidth * it.value) / 100;
-    const x1 = linesLeft;
-    const x2 = linesLeft + lineLen;
+  // BARS
+  // Opacidades tipo “tonos” sin colores nuevos
+  const minOp = 0.25;
+  const maxOp = 0.85;
 
+  items.forEach((it, i) => {
+    const cx = plotLeft + slot * (i + 0.5);
+    const x = cx - barW / 2;
+
+    const h = (it.value / 100) * barsH;
+    const yTop = baselineY - h;
+
+    const t = n <= 1 ? 1 : i / (n - 1);
+    const op = minOp + (maxOp - minOp) * t;
+
+    // barra
     parts.push(
-      `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"
-             stroke="${mainTextColor}" stroke-width="${strokeW}" stroke-linecap="butt" />`
+      `<rect x="${x}" y="${yTop}" width="${barW}" height="${h}"
+             fill="${mainTextColor}" fill-opacity="${op}" />`
     );
 
-    const pctX = x2 + S(10);
+    // % arriba
+    const pctText = `${it.value.toFixed(1).replace(/\.0$/, "")}%`;
     parts.push(
-      `<text x="${pctX}" y="${y + pctDy}"
-             fill="${mainTextColor}"
+      `<text x="${cx}" y="${yTop - pctGap}"
+             fill="${mainTextColor}" fill-opacity="${op}"
              font-family="${FONT_STACK}"
              font-size="${pctFs}"
              font-weight="700"
-             text-anchor="start">${esc(`${Math.round(it.value)}%`)}</text>`
+             text-anchor="middle">${esc(pctText)}</text>`
     );
 
-    parts.push(
-      `<text x="${pctX}" y="${y + labelDy}"
-             fill="${mainTextColor}"
-             font-family="${FONT_STACK}"
-             font-size="${labelFs}"
-             font-weight="${labelWeight}"
-             text-anchor="start">${esc(it.label)}</text>`
-    );
+    // label abajo (1–2 líneas)
+    const lines = wrapLabel(it.label, useTallRules ? 12 : 10, 2);
+    if (lines.length) {
+      const baseY = baselineY + labelGap;
+      lines.forEach((ln, j) => {
+        parts.push(
+          `<text x="${cx}" y="${baseY + j * (labelFs + S(6))}"
+                 fill="${mainTextColor}" fill-opacity="${op}"
+                 font-family="${FONT_STACK}"
+                 font-size="${labelFs}"
+                 font-weight="600"
+                 text-anchor="middle">${esc(ln)}</text>`
+        );
+      });
+    }
   });
 
   parts.push(`</svg>`);

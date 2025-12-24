@@ -36,6 +36,7 @@ export type ChartType =
   | "mediumdonut"
   | "barnarrow"
   | "stackedvertical"
+  | "narrowvertbars"
   | "singletrack";
 
 export interface DatasetColumn {
