@@ -90,20 +90,31 @@ const mdColorFor = (label: string, customColors?: Record<string, string>) => {
   return ChartConfig.colors.neutral;
 };
 
+/* ✅ CORREGIDO: interpretar porcentaje EXACTAMENTE como viene del sheet */
 function parsePercentCell(raw: any): number {
   if (raw == null) return 0;
+
+  // número
   if (typeof raw === "number") {
-    let n = raw;
-    if (n > 0 && n <= 1) n = n * 100;
-    return n;
+    if (raw > 0 && raw <= 1) return raw * 100; // 0.27 => 27
+    return raw; // 27 => 27
   }
+
+  // string
   const s = String(raw).trim();
   if (!s) return 0;
 
-  const cleaned = s.replace("%", "").replace(",", ".").trim();
+  if (s.includes("%")) {
+    const cleaned = s.replace("%", "").replace(",", ".").trim();
+    const n = Number(cleaned);
+    return Number.isNaN(n) ? 0 : n;
+  }
+
+  const cleaned = s.replace(",", ".").trim();
   const n = Number(cleaned);
   if (Number.isNaN(n)) return 0;
-  if (n >= 0 && n <= 1) return n * 100;
+
+  if (n > 0 && n <= 1) return n * 100;
   return n;
 }
 
@@ -198,28 +209,10 @@ export function buildMediumDonutSvg({
 
   const lineY = titleY + titleBlockH + 16;
 
-  // datos válidos para la dona
   const safeData = data.filter((d) => (d.percentage ?? 0) > 0);
   if (!safeData.length) {
-    return basicMediumDonutMessageSvg(
-      "No hay datos para la gráfica.",
-      bg,
-      mainTextColor
-    );
+    return basicMediumDonutMessageSvg("No hay datos para la gráfica.", bg, mainTextColor);
   }
-
-  // orden de filas (labels)
-  const orderedLabels: string[] =
-    labelOrder && labelOrder.length
-      ? labelOrder.filter((l) => safeData.some((d) => d.label === l))
-      : safeData.map((d) => d.label);
-
-  /* ------------------------------------------------------------------ */
-  /* SUMMARY MODE: tabla comparativa desde sheet (SIN cálculos)         */
-  /* ------------------------------------------------------------------ */
-
-  let headers: string[] = [];
-  let rowData: Record<string, number[]> = {};
 
   if (inputMode !== "summary") {
     return basicMediumDonutMessageSvg(
@@ -241,26 +234,41 @@ export function buildMediumDonutSvg({
   const parsed = parseA1Range(answerRange);
 
   if (!qPos || !parsed) {
-    return basicMediumDonutMessageSvg(
-      "Rango o celda inválidos.",
-      bg,
-      mainTextColor
-    );
+    return basicMediumDonutMessageSvg("Rango o celda inválidos.", bg, mainTextColor);
   }
 
   const { rowStart, rowEnd, colStart, colEnd } = parsed;
 
-  // headers en la fila de la pregunta, columnas colStart..colEnd
+  // headers
   const headerRow = sheetValues[qPos.row - 1] || [];
-  headers = [];
+  const headers: string[] = [];
   for (let c = colStart; c <= colEnd; c++) {
     const v = headerRow[c - 1];
     if (v != null && String(v).trim()) headers.push(String(v).trim());
   }
 
-  // row labels en la columna anterior, filas rowStart..rowEnd
-  rowData = {};
-  orderedLabels.forEach((label) => (rowData[label] = []));
+  if (!headers.length) {
+    return basicMediumDonutMessageSvg("No se encontraron headers en la tabla.", bg, mainTextColor);
+  }
+
+  // row labels
+  const rowOrder: string[] = [];
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const row = sheetValues[r - 1] || [];
+    const rowLabelRaw = row[colStart - 2];
+    const rowLabel = rowLabelRaw != null ? String(rowLabelRaw).trim() : "";
+    if (!rowLabel) continue;
+    rowOrder.push(rowLabel);
+  }
+
+  const labels =
+    labelOrder && labelOrder.length
+      ? labelOrder.filter((l) => rowOrder.includes(l))
+      : rowOrder;
+
+  // ✅ llenar rowData
+  const rowData: Record<string, number[]> = {};
+  labels.forEach((label) => (rowData[label] = []));
 
   for (let r = rowStart; r <= rowEnd; r++) {
     const row = sheetValues[r - 1] || [];
@@ -268,26 +276,20 @@ export function buildMediumDonutSvg({
     const rowLabel = rowLabelRaw != null ? String(rowLabelRaw).trim() : "";
     if (!rowLabel) continue;
 
-    if (!rowData[rowLabel]) rowData[rowLabel] = [];
-
     const values: number[] = [];
     for (let c = colStart; c <= colEnd; c++) {
       values.push(Math.round(parsePercentCell(row[c - 1])));
     }
+
     rowData[rowLabel] = values;
   }
 
-  if (!headers.length) {
-    return basicMediumDonutMessageSvg(
-      "No se encontraron headers en la tabla.",
-      bg,
-      mainTextColor
-    );
-  }
+  /* ---------------- DONUT ---------------- */
 
-  /* ------------------------------------------------------------------ */
-  /* DONA (izquierda)                                                   */
-  /* ------------------------------------------------------------------ */
+  const orderedLabels =
+    labelOrder && labelOrder.length
+      ? labelOrder.filter((l) => safeData.some((d) => d.label === l))
+      : safeData.map((d) => d.label);
 
   const legendData = (() => {
     const byLabel = new Map(safeData.map((d) => [d.label, d]));
@@ -355,9 +357,7 @@ export function buildMediumDonutSvg({
     );
   });
 
-  /* ------------------------------------------------------------------ */
-  /* LEYENDA                                                            */
-  /* ------------------------------------------------------------------ */
+  /* ---------------- LEGEND ---------------- */
 
   const legendTop = donutCy + outerR + (isTall1440 ? 40 : 90);
   const legendItems = legendData;
@@ -377,8 +377,7 @@ export function buildMediumDonutSvg({
     const colIdx = idx % legendCols;
     const rowIdx = Math.floor(idx / legendCols);
 
-    const x =
-      marginLeft + colIdx * legendColWidth + legendColWidth / 2;
+    const x = marginLeft + colIdx * legendColWidth + legendColWidth / 2;
     const y = legendTop + rowIdx * legendRowHeight;
 
     const pillBg = mdColorFor(it.label, customColors);
@@ -430,9 +429,7 @@ export function buildMediumDonutSvg({
     );
   });
 
-  /* ------------------------------------------------------------------ */
-  /* TABLA DERECHA                                                      */
-  /* ------------------------------------------------------------------ */
+  /* ---------------- TABLE ---------------- */
 
   const tableTop = contentTop;
   const headerHeight = 60;
@@ -440,8 +437,6 @@ export function buildMediumDonutSvg({
   const tableHeight = tableBottom - tableTop;
 
   const tableBodyY = tableTop + headerHeight;
-
-  const labels = orderedLabels;
   const rowsCount = labels.length || 1;
   const rowHeight = Math.max(40, (tableHeight - headerHeight) / rowsCount);
 
@@ -451,7 +446,6 @@ export function buildMediumDonutSvg({
 
   const tableParts: string[] = [];
 
-  // Encabezados
   headers.forEach((h, idx) => {
     const x = rightX0 + labelColWidth + idx * colWidth;
     const rectY = tableTop + 8;
@@ -467,7 +461,6 @@ export function buildMediumDonutSvg({
     );
   });
 
-  // Filas
   labels.forEach((label, rowIdx) => {
     const y = tableBodyY + rowIdx * rowHeight;
     const pillBg = mdColorFor(label, customColors);
@@ -506,7 +499,6 @@ export function buildMediumDonutSvg({
     );
 
     const values = rowData[label] ?? [];
-
     values.forEach((val, idx) => {
       const cellX = rightX0 + labelColWidth + idx * colWidth;
 
@@ -523,9 +515,7 @@ export function buildMediumDonutSvg({
     });
   });
 
-  /* ------------------------------------------------------------------ */
-  /* SVG Output                                                         */
-  /* ------------------------------------------------------------------ */
+  /* ---------------- SVG OUTPUT ---------------- */
 
   const parts: string[] = [];
 
@@ -562,12 +552,8 @@ export function buildMediumDonutSvg({
 
   parts.push(
     `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
+    `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
+    `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
   parts.push(`<g>`, ...donutPaths, `</g>`);

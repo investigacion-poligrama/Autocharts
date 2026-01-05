@@ -69,6 +69,48 @@ function parseA1Range(range: string) {
     colEnd: Math.max(start.col, end.col),
   };
 }
+function buildMediumDonutSummary(values: any[][], range: string): FrequencyData[] {
+  const trimmed = range.trim();
+  if (!trimmed) return [];
+
+  let parsed;
+  try {
+    parsed = parseA1Range(trimmed);
+  } catch {
+    return [];
+  }
+
+  const { rowStart, rowEnd, colStart } = parsed;
+
+  const freqs: FrequencyData[] = [];
+
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const row = values[r - 1] || [];
+
+    // ✅ label en columna anterior al rango
+    const rawLabel = row[colStart - 2];
+    const label = rawLabel != null ? String(rawLabel).trim() : "";
+    if (!label) continue;
+
+    // ✅ porcentaje en la primera columna del rango (B)
+    const rawPercent = row[colStart - 1];
+    let pct = 0;
+
+    if (typeof rawPercent === "number") {
+      pct = rawPercent > 0 && rawPercent <= 1 ? rawPercent * 100 : rawPercent;
+    } else if (typeof rawPercent === "string") {
+      const cleaned = rawPercent.replace("%", "").replace(",", ".").trim();
+      const parsedNum = parseFloat(cleaned);
+      if (!Number.isNaN(parsedNum)) pct = parsedNum <= 1 ? parsedNum * 100 : parsedNum;
+    }
+
+    pct = Number(pct.toFixed(1));
+
+    freqs.push({ label, value: pct, percentage: pct });
+  }
+
+  return freqs;
+}
 
 function buildSingleTrackFromRange(values: any[][], range: string): FrequencyData[] {
   const trimmed = range.trim();
@@ -427,12 +469,15 @@ export default function Home() {
     }
 
     let freqs: FrequencyData[] =
-      chartType === "singletrack"
-        ? buildSingleTrackFromRange(sheetValues, answerRange)
-        : chartType === "matrix"
-        ? buildMatrixFrequencies(sheetValues, answerRange)
-        : buildSummaryFrequenciesFromRange(sheetValues, answerRange);
-        if (chartType === "matrix") {
+    chartType === "singletrack"
+    ? buildSingleTrackFromRange(sheetValues, answerRange)
+    : chartType === "matrix"
+    ? buildMatrixFrequencies(sheetValues, answerRange)
+    : chartType === "mediumdonut"
+    ? buildMediumDonutSummary(sheetValues, answerRange)
+    : buildSummaryFrequenciesFromRange(sheetValues, answerRange);
+
+       if (chartType === "matrix" || chartType === "mediumdonut") {
         const rowLabels = buildMatrixRowLabels(sheetValues, answerRange);
           setMatrixRowOrder((prev) => {
             if (!prev.length) return rowLabels;
