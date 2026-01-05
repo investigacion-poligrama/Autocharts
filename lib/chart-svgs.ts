@@ -35,7 +35,10 @@ export interface ChartSvgArgs {
   answerRange?: string;
   backgroundColor?: string;
   textColor?: string;
-  brand?: Brand;       
+  brand?: Brand;
+  questionCell?: string;    
+  matrixRowOrder?: string[];
+  
 }
 
 /* ------------------------------------------------------------------ */
@@ -301,21 +304,22 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
 
 
   matrix: (args) =>
-    buildMatrixSvg({
-      data: args.data,
-      title: args.title,
-      columns: args.columns ?? [],
-      customColors: args.customColors,
-      secondColumn: args.secondColumn ?? "",
-      sheetTitle: args.sheetTitle,
-      width: args.width,
-      height: args.height,
-      inputMode: args.inputMode,
-      sheetValues: args.sheetValues,
-      secondAnswerRange: args.secondAnswerRange,
-      backgroundColor: args.backgroundColor,
-      textColor: args.textColor,
-    }),
+  buildMatrixSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    inputMode: args.inputMode,
+    sheetValues: args.sheetValues,
+    answerRange: args.answerRange,         
+    questionCell: args.questionCell,        
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+    matrixRowOrder: args.matrixRowOrder,
+  }),
+
 
   score: (args) =>
     buildScoreSvg({
@@ -382,7 +386,8 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       labelOrder: args.labelOrder,
       inputMode: args.inputMode,
       sheetValues: args.sheetValues,
-      secondAnswerRange: args.secondAnswerRange,
+      answerRange: args.answerRange,
+      questionCell: args.questionCell,
       backgroundColor: args.backgroundColor,
       textColor: args.textColor,
     }),

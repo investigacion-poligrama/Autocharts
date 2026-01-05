@@ -180,6 +180,9 @@ export function ColumnSelector({
   const isStackedSummary =
     chartType === "stacked" && inputMode === "summary";
 
+  const isMatrixSummary = chartType === "matrix" && inputMode === "summary";
+
+
   /* ------------------------------------------------------------------
    *  Leyenda real para stacked + summary (leer desde answerRange)
    * ------------------------------------------------------------------ */
@@ -208,32 +211,72 @@ export function ColumnSelector({
     }
   }, [isStackedSummary, answerRange, sheetValues]);
 
+  const rowLabelsForMatrixSummary: string[] = useMemo(() => {
+  if (!isMatrixSummary) return [];
+  if (!answerRange.trim() || !sheetValues.length) return [];
+
+  try {
+    const parsed = parseA1Range(answerRange.trim());
+    const { rowStart, rowEnd, colStart } = parsed;
+
+    // fila headers = rowStart, labels empiezan en rowStart+1
+    const labels: string[] = [];
+
+    for (let r = rowStart; r <= rowEnd; r++) {
+      const row = sheetValues[r - 1] || [];
+      const cell = row[colStart - 2];
+      const label = cell != null ? String(cell).trim() : "";
+      if (label) labels.push(label);
+    }
+
+    return Array.from(new Set(labels));
+  } catch {
+    return [];
+  }
+}, [isMatrixSummary, answerRange, sheetValues]);
+
+
   /**
    * Este es el array que realmente usamos para el selector de colores.
    * - Normal: usamos `frequencies` entero
    * - Stacked + summary: SOLO las etiquetas de la leyenda
    */
   const colorRows: FrequencyData[] = useMemo(() => {
-    if (!frequencies.length) return [];
+  if (!frequencies.length) return [];
 
-    if (!isStackedSummary) return frequencies;
+  // ✅ MATRIX summary: usar las filas del rango
+  if (isMatrixSummary && rowLabelsForMatrixSummary.length) {
+    return rowLabelsForMatrixSummary.map((label) => ({
+      label,
+      value: 0,
+      percentage: 0,
+    }));
+  }
 
-    if (!legendLabelsForStackedSummary.length) {
-      // si por algo no pudimos leer la leyenda, caemos al comportamiento normal
-      return frequencies;
-    }
+  // ✅ stacked summary: solo leyenda
+  if (isStackedSummary) {
+    if (!legendLabelsForStackedSummary.length) return frequencies;
 
     const legendSet = new Set(legendLabelsForStackedSummary);
-
     const byLabel = new Map<string, FrequencyData>();
+
     frequencies.forEach((f) => {
       if (!legendSet.has(f.label)) return;
       if (!byLabel.has(f.label)) byLabel.set(f.label, f);
     });
 
     return Array.from(byLabel.values());
-  }, [frequencies, isStackedSummary, legendLabelsForStackedSummary]);
+  }
 
+  // ✅ default
+  return frequencies;
+}, [
+  frequencies,
+  isStackedSummary,
+  legendLabelsForStackedSummary,
+  isMatrixSummary,
+  rowLabelsForMatrixSummary,
+]);
   const showFreqList = colorRows.length > 0;
 
   return (

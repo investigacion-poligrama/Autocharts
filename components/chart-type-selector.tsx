@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";       
 import {
   Card,
   CardContent,
@@ -9,13 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   PieChart,
   BarChart3,
@@ -26,50 +18,39 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { ChartType, DatasetColumn } from "@/app/page";
-import { Input } from "@/components/ui/input";
-import { RangePicker } from "@/components/ui/range-picker"; 
 import type { Brand } from "@/types/brand";
-
 
 interface ChartTypeSelectorProps {
   chartType: ChartType;
   onSelect: (type: ChartType) => void;
   showMatrixOption: boolean;
+
+  // ✅ mantenemos para no romper page.tsx
   onSecondColumnSelect: (column: string) => void;
   columns: DatasetColumn[];
   selectedSecondColumn: string;
+
   inputMode: "raw" | "summary";
+
+  // ✅ mantenemos para no romper page.tsx
   secondQuestionCell: string;
   onSecondQuestionCellChange: (value: string) => void;
   secondAnswerRange: string;
   onSecondAnswerRangeChange: (value: string) => void;
+
   sheetValues: any[][];
-  brand: Brand;                     
+  brand: Brand;
 }
 
 export function ChartTypeSelector({
   chartType,
   onSelect,
   showMatrixOption,
-  onSecondColumnSelect,
-  columns,
-  selectedSecondColumn,
-  inputMode,
-  secondQuestionCell,
-  onSecondQuestionCellChange,
-  secondAnswerRange,
-  onSecondAnswerRangeChange,
-  sheetValues,
-  brand                                 
+  brand,
 }: ChartTypeSelectorProps) {
-  type SecondRangeTarget = "secondQuestion" | "secondAnswer";
   const isPoligrama = brand === "poligrama";
   const isCens = brand === "censEdmundSinsa";
   const isDeskover = brand === "deskover";
-  const [secondRangeTarget, setSecondRangeTarget] =
-    useState<SecondRangeTarget | null>(null);
-  const needsSecondColumn =
-    chartType === "matrix" || chartType === "mediumdonut";
 
   return (
     <Card>
@@ -81,7 +62,7 @@ export function ChartTypeSelector({
       </CardHeader>
 
       <CardContent className="space-y-4">
-                <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {/* ==== POLIGRAMA ==== */}
           {isPoligrama && (
             <>
@@ -173,65 +154,68 @@ export function ChartTypeSelector({
                 </div>
               </Button>
 
-              <Button
-                variant={chartType === "matrix" ? "default" : "outline"}
-                onClick={() => onSelect("matrix")}
-                className="flex-1"
-              >
-                <div className="flex items-center gap-2">
-                  <Grid3x3 className="h-4 w-4" />
-                  Matrix
-                </div>
-              </Button>
+              {showMatrixOption && (
+                <Button
+                  variant={chartType === "matrix" ? "default" : "outline"}
+                  onClick={() => onSelect("matrix")}
+                  className="flex-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <Grid3x3 className="h-4 w-4" />
+                    Matrix
+                  </div>
+                </Button>
+              )}
             </>
           )}
 
           {/* ==== CENS / EDMUND / SINSA ==== */}
           {isCens && (
             <>
-            <Button
-              variant={chartType === "stackedvertical" ? "default" : "outline"}
-              onClick={() => onSelect("stackedvertical")}
-              className="flex-1"
-            >
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Stacked bar
-              </div>
-            </Button>
+              <Button
+                variant={chartType === "stackedvertical" ? "default" : "outline"}
+                onClick={() => onSelect("stackedvertical")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Stacked bar
+                </div>
+              </Button>
 
-            <Button
-              variant={chartType === "barnarrow" ? "default" : "outline"}
-              onClick={() => onSelect("barnarrow")}
-              className="flex-1"
-            >
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Narrow Bar
-              </div>
-            </Button>
+              <Button
+                variant={chartType === "barnarrow" ? "default" : "outline"}
+                onClick={() => onSelect("barnarrow")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Narrow Bar
+                </div>
+              </Button>
 
-            <Button
-              variant={chartType === "singletrack" ? "default" : "outline"}
-              onClick={() => onSelect("singletrack")}
-              className="flex-1"
-            >
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Single Track
-              </div>
-            </Button>
-            <Button
-              variant={chartType === "narrowvertbars" ? "default" : "outline"}
-              onClick={() => onSelect("narrowvertbars")}
-              className="flex-1"
-            >
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Vert Bars
-              </div>
-            </Button>
-             </>
+              <Button
+                variant={chartType === "singletrack" ? "default" : "outline"}
+                onClick={() => onSelect("singletrack")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Single Track
+                </div>
+              </Button>
+
+              <Button
+                variant={chartType === "narrowvertbars" ? "default" : "outline"}
+                onClick={() => onSelect("narrowvertbars")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Vert Bars
+                </div>
+              </Button>
+            </>
           )}
 
           {/* ==== DESKOVER ==== */}
@@ -239,7 +223,7 @@ export function ChartTypeSelector({
             <>
               <Button
                 variant={chartType === "bar" ? "default" : "outline"}
-                onClick={() => onSelect("bar")} // Horizontal bars (provisional)
+                onClick={() => onSelect("bar")}
                 className="flex-1"
               >
                 <div className="flex items-center gap-2">
@@ -250,7 +234,7 @@ export function ChartTypeSelector({
 
               <Button
                 variant={chartType === "donut" ? "default" : "outline"}
-                onClick={() => onSelect("donut")} // Donut (provisional)
+                onClick={() => onSelect("donut")}
                 className="flex-1"
               >
                 <div className="flex items-center gap-2">
@@ -261,7 +245,7 @@ export function ChartTypeSelector({
 
               <Button
                 variant={chartType === "stackedvertical" ? "default" : "outline"}
-                onClick={() => onSelect("stackedvertical")} // Vertical bar (provisional)
+                onClick={() => onSelect("stackedvertical")}
                 className="flex-1"
               >
                 <div className="flex items-center gap-2">
@@ -272,133 +256,6 @@ export function ChartTypeSelector({
             </>
           )}
         </div>
-
-
-        {/* SEGUNDA PREGUNTA - modo BASE DE DATOS */}
-        {needsSecondColumn && showMatrixOption && inputMode === "raw" && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Select Second Question
-            </label>
-            <Select
-              value={selectedSecondColumn}
-              onValueChange={onSecondColumnSelect}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a second column..." />
-              </SelectTrigger>
-              <SelectContent>
-                {columns.map((column, idx) => (
-                  <SelectItem
-                    key={`${column.name}-${idx}`}
-                    value={column.name}
-                  >
-                    {column.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* SEGUNDA PREGUNTA - modo TABLA DE RESULTADOS */}
-        {needsSecondColumn && showMatrixOption && inputMode === "summary" && (
-          <div className="space-y-4">
-            {/* Celda con la segunda pregunta */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Celda con la segunda pregunta
-              </label>
-
-              <div className="flex items-center gap-2">
-                <Input
-                  value={secondQuestionCell}
-                  onChange={(e) =>
-                    onSecondQuestionCellChange(e.target.value)
-                  }
-                  placeholder="Ej. H6"
-                  className="max-w-xs"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSecondRangeTarget("secondQuestion")}
-                  disabled={!sheetValues.length}
-                >
-                  Seleccionar
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Usa notación A1 (columna + fila). Ejemplo:{" "}
-                <code className="font-mono">H6</code> para la celda donde está
-                el título de la segunda pregunta.
-              </p>
-            </div>
-
-            {/* Rango de respuestas y % (segunda pregunta) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Rango de respuestas y % (segunda pregunta)
-              </label>
-
-              <div className="flex items-center gap-2">
-                <Input
-                  value={secondAnswerRange}
-                  onChange={(e) =>
-                    onSecondAnswerRangeChange(e.target.value)
-                  }
-                  placeholder="Ej. H7:I15"
-                  className="max-w-xs"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSecondRangeTarget("secondAnswer")}
-                  disabled={!sheetValues.length}
-                >
-                  Seleccionar
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                El rango debe incluir{" "}
-                <span className="font-semibold">dos columnas</span>: la primera
-                con las respuestas (etiquetas) y la segunda con el porcentaje.
-                Ejemplo: <code className="font-mono">H7:I15</code>.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* RangePicker para la segunda pregunta (summary) */}
-        {secondRangeTarget && sheetValues.length > 0 && (
-          <RangePicker
-            open={true}
-            sheetValues={sheetValues}
-            // usamos los mismos targets que el RangePicker original
-            target={
-              secondRangeTarget === "secondQuestion" ? "question" : "answer"
-            }
-            initialRange={
-              secondRangeTarget === "secondQuestion"
-                ? secondQuestionCell
-                : secondAnswerRange
-            }
-            onClose={() => setSecondRangeTarget(null)}
-            // ignoramos el segundo parámetro (target) del callback,
-            // usamos nuestro estado secondRangeTarget
-            onConfirm={(range) => {
-              if (secondRangeTarget === "secondQuestion") {
-                onSecondQuestionCellChange(range);
-              } else {
-                onSecondAnswerRangeChange(range);
-              }
-            }}
-          />
-        )}
       </CardContent>
     </Card>
   );

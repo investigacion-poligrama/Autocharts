@@ -30,9 +30,11 @@ interface ChartPreviewProps {
   stackedLabelCells?: string;
   stackedRangesSummary?: string;
   answerRange?: string;
+  questionCell?: string;
   previewBg: string;
   brand?: Brand;
   previewTextColor: string;
+  matrixRowOrder?: string[];
 }
 
 export default function ChartPreview({
@@ -56,16 +58,17 @@ export default function ChartPreview({
   stackedLabelCells,
   stackedRangesSummary,
   answerRange,
+  questionCell,
   previewBg,
   previewTextColor,
   brand,
+  matrixRowOrder,
+  
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgMarkup, setSvgMarkup] = useState<string>("");
-  const { addChart } = useExportQueue(); // si no lo usas luego lo quitas
-
-  // ✅ aquí debe vivir isCens (no dentro de handleExport)
+  const { addChart } = useExportQueue();
   const isCens = brand === "censEdmundSinsa";
 
   useEffect(() => {
@@ -92,6 +95,8 @@ export default function ChartPreview({
       stackedLabelCells,
       stackedRangesSummary,
       answerRange,
+      questionCell,
+      matrixRowOrder,
       backgroundColor: previewBg,
       textColor: previewTextColor,
       brand: brand ?? "poligrama",
@@ -116,9 +121,11 @@ export default function ChartPreview({
     stackedLabelCells,
     stackedRangesSummary,
     answerRange,
+    questionCell,
     previewBg,
     previewTextColor,
     brand,
+    matrixRowOrder,
   ]);
 
   const handleExport = () => {
@@ -145,11 +152,13 @@ export default function ChartPreview({
         stackedLabelCells,
         stackedRangesSummary,
         answerRange,
+        questionCell,
         backgroundColor: previewBg,
         textColor: previewTextColor,
         sheetValues,
         secondAnswerRange,
         brand: brand ?? "poligrama",
+        matrixRowOrder,
       });
 
       const blob = new Blob([svg], {

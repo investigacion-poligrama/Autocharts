@@ -8,17 +8,8 @@ import { ChartTypeSelector } from "@/components/chart-type-selector";
 import ChartPreview from "@/components/chart-preview";
 import { GoogleAuth } from "@/components/google-auth";
 import { DragList } from "@/components/ui/draglist";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  calculateRawFrequencies,
-  parseSpreadsheetId,
-} from "@/lib/frequencies";
+
+import { calculateRawFrequencies, parseSpreadsheetId } from "@/lib/frequencies";
 import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
@@ -52,7 +43,7 @@ export interface FrequencyData {
 
 type InputMode = "raw" | "summary";
 
-// --- Helpers para notación A1 y tabla de resultados ---
+/* Helpers A1 */
 
 function a1ToRowCol(a1: string) {
   const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
@@ -61,21 +52,16 @@ function a1ToRowCol(a1: string) {
   }
   const [, colLetters, rowStr] = match;
   let col = 0;
-  for (const ch of colLetters) {
-    col = col * 26 + (ch.charCodeAt(0) - 64); // A=1, B=2...
-  }
+  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
   const row = parseInt(rowStr, 10);
-  if (!row || row < 1) {
-    throw new Error(`Fila inválida en referencia A1: ${a1}`);
-  }
-  return { row, col }; // 1-based
+  if (!row || row < 1) throw new Error(`Fila inválida en referencia A1: ${a1}`);
+  return { row, col };
 }
 
 function parseA1Range(range: string) {
   const [startStr, endStr] = range.split(":");
   const start = a1ToRowCol(startStr);
   const end = endStr ? a1ToRowCol(endStr) : start;
-
   return {
     rowStart: Math.min(start.row, end.row),
     rowEnd: Math.max(start.row, end.row),
@@ -83,10 +69,10 @@ function parseA1Range(range: string) {
     colEnd: Math.max(start.col, end.col),
   };
 }
+
 function buildSingleTrackFromRange(values: any[][], range: string): FrequencyData[] {
   const trimmed = range.trim();
   if (!trimmed) return [];
-
   let parsed;
   try {
     parsed = parseA1Range(trimmed);
@@ -95,18 +81,13 @@ function buildSingleTrackFromRange(values: any[][], range: string): FrequencyDat
   }
 
   const { rowStart, colStart, colEnd } = parsed;
-
-  // fila 1 del rango: headers (meses) empezando en colStart+1
   const headerRow = values[rowStart - 1] || [];
-  // fila 2 del rango: valores (números) empezando en colStart+1
   const valueRow = values[rowStart] || [];
-
   const out: FrequencyData[] = [];
 
   for (let c = colStart + 1; c <= colEnd; c++) {
     const rawMonth = headerRow[c - 1];
     const rawVal = valueRow[c - 1];
-
     const label = rawMonth != null ? String(rawMonth).trim() : "";
     if (!label) continue;
 
@@ -119,85 +100,100 @@ function buildSingleTrackFromRange(values: any[][], range: string): FrequencyDat
     }
 
     const rounded = Number(v.toFixed(1));
-
     out.push({ label, value: rounded, percentage: rounded });
   }
 
   return out;
 }
 
-function buildSummaryFrequenciesFromRange(
-  values: any[][],
-  range: string
-): FrequencyData[] {
+function buildSummaryFrequenciesFromRange(values: any[][], range: string): FrequencyData[] {
+  const trimmed = range.trim();
+  if (!trimmed) return [];
+  let parsed;
+
+  try {
+    parsed = parseA1Range(trimmed);
+  } catch {
+    return [];
+  }
+
+  const { rowStart, rowEnd, colStart } = parsed;
+  const freqs: FrequencyData[] = [];
+
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const row = values[r - 1] || [];
+    const rawLabel = row[colStart - 1];
+    const rawPercent = row[colStart];
+
+    const label = rawLabel != null ? String(rawLabel).trim() : "";
+    if (!label) continue;
+    const labelAsNumber = Number(label.replace(",", "."));
+    if (!Number.isNaN(labelAsNumber)) continue;
+    const numLabel = Number(label);
+    if (!isNaN(numLabel) && numLabel > 0 && numLabel < 1) continue;
+
+
+    let percNum = 0;
+
+    if (typeof rawPercent === "number") {
+      let v = rawPercent;
+      if (v > 0 && v <= 1) v = v * 100;
+      percNum = v;
+    } else if (typeof rawPercent === "string") {
+      const cleaned = rawPercent.replace("%", "").replace(",", ".").trim();
+      const parsedNum = parseFloat(cleaned);
+      if (!Number.isNaN(parsedNum)) percNum = parsedNum;
+    }
+
+    const rounded = Number(percNum.toFixed(1));
+    freqs.push({ label, value: rounded, percentage: rounded });
+  }
+
+  return freqs;
+}
+
+function buildMatrixRowLabels(values: any[][], range: string): string[] {
   const trimmed = range.trim();
   if (!trimmed) return [];
 
   let parsed;
   try {
     parsed = parseA1Range(trimmed);
-  } catch (err) {
-    console.warn("Rango A1 aún no válido:", trimmed, err);
+  } catch {
     return [];
   }
 
-  const { rowStart, rowEnd, colStart, colEnd } = parsed;
+  const { rowStart, rowEnd, colStart } = parsed;
 
-  // Necesitamos al menos dos columnas: etiqueta + porcentaje
-  if (colEnd < colStart + 1) {
-    console.warn(
-      "El rango debería incluir al menos dos columnas (etiqueta y %).",
-      trimmed
-    );
-  }
-
-  const freqs: FrequencyData[] = [];
+  const labels: string[] = [];
 
   for (let r = rowStart; r <= rowEnd; r++) {
     const row = values[r - 1] || [];
-    const rawLabel = row[colStart - 1]; // primera col del rango
-    const rawPercent = row[colStart];   // segunda col del rango
-
+    const rawLabel = row[colStart - 2]; // columna previa al inicio
     const label = rawLabel != null ? String(rawLabel).trim() : "";
     if (!label) continue;
-
-    let percNum = 0;
-
-    if (typeof rawPercent === "number") {
-      // Google suele guardar 40.7% como 0.407 → lo convertimos a 40.7
-      let v = rawPercent;
-      if (v > 0 && v <= 1) {
-        v = v * 100;
-      }
-      percNum = v;
-    } else if (typeof rawPercent === "string") {
-      const cleaned = rawPercent.replace("%", "").replace(",", ".").trim();
-      const parsedNum = parseFloat(cleaned);
-      if (!Number.isNaN(parsedNum)) {
-        percNum = parsedNum; // ya viene como 40.7 o similar
-      }
-    }
-    const rounded = Number(percNum.toFixed(1));
-
-    freqs.push({
-      label,
-      value: rounded,
-      percentage: rounded,
-    });
+    labels.push(label);
   }
 
-  return freqs;
+  return labels;
+}
+
+function buildMatrixFrequencies(values: any[][], range: string): FrequencyData[] {
+  const labels = buildMatrixRowLabels(values, range);
+
+  return labels.map((label) => ({
+    label,
+    value: 0,
+    percentage: 0,
+  }));
 }
 
 
-
-
-/* ------------------------------------------------------------------
- * Página principal
- * ------------------------------------------------------------------ */
+/* ---------------- Page ---------------- */
 
 export default function Home() {
   const { items, addChart, downloadZip } = useExportQueue();
+
   const [datasetUrl, setDatasetUrl] = useState("");
   const [columns, setColumns] = useState<DatasetColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string>("");
@@ -206,32 +202,50 @@ export default function Home() {
   const [frequencies, setFrequencies] = useState<FrequencyData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [authToken, setAuthToken] = useState<string>("");
+
   const [sheets, setSheets] = useState<Array<{ name: string; id: number }>>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
+
   const [customColors, setCustomColors] = useState<Record<string, string>>({});
   const [previewBg, setPreviewBg] = useState<string>("#000000");
   const [previewTextColor, setPreviewTextColor] = useState<string>("#FFFFFF");
+
   const [ordered, setOrdered] = useState<FrequencyData[]>([]);
   const [excludedLabels, setExcludedLabels] = useState<string[]>([]);
   const [inputMode, setInputMode] = useState<InputMode>("raw");
   const [stackedColumns, setStackedColumns] = useState<string[]>([]);
+
   const [sheetValues, setSheetValues] = useState<any[][]>([]);
   const [questionCell, setQuestionCell] = useState<string>("");
   const [answerRange, setAnswerRange] = useState<string>("");
+
   const [secondQuestionCell, setSecondQuestionCell] = useState<string>("");
   const [secondAnswerRange, setSecondAnswerRange] = useState<string>("");
+
   const [stackedLabelCells, setStackedLabelCells] = useState<string>("");
   const [stackedRangesSummary, setStackedRangesSummary] = useState<string>("");
-  const [brand, setBrand] = useState<Brand | null>(null);
-  const handleBrandSelect = (b: Brand) => {
-  const theme = getBrandTheme(b);
-  setBrand(b);
-  setPreviewBg(theme.defaultBackground);
-  setPreviewTextColor(theme.defaultTextColor);
-};
 
-  
- useEffect(() => {
+  const [brand, setBrand] = useState<Brand | null>(null);
+
+  // ✅ Matrix: orden de filas
+  const [matrixRowOrder, setMatrixRowOrder] = useState<string[]>([]);
+
+  const handleBrandSelect = (b: Brand) => {
+    const theme = getBrandTheme(b);
+    setBrand(b);
+    setPreviewBg(theme.defaultBackground);
+    setPreviewTextColor(theme.defaultTextColor);
+  };
+  useEffect(() => {
+  if (chartType === "tracking") return;
+
+  setOrdered([]);
+  setExcludedLabels([]);
+  setMatrixRowOrder([]);
+  setCustomColors({});
+}, [chartType]);
+
+  useEffect(() => {
     setStackedColumns([]);
   }, [inputMode]);
 
@@ -245,28 +259,23 @@ export default function Home() {
       if (cellValue != null && cellValue !== "") {
         setSelectedColumn(String(cellValue));
       } else {
-        // fallback: usamos la referencia como título
         setSelectedColumn(questionCell);
       }
-    } catch (err) {
-      console.warn("Referencia de celda inválida para pregunta:", err);
+    } catch {
+      // noop
     }
   }, [inputMode, questionCell, sheetValues]);
 
-type CanvasPreset = "1920x1080" | "1440x1800";
+  type CanvasPreset = "1920x1080" | "1440x1800";
+  const CANVAS_PRESETS: Record<CanvasPreset, { width: number; height: number; label: string }> = {
+    "1920x1080": { width: 1920, height: 1080, label: "1920 × 1080 px" },
+    "1440x1800": { width: 1440, height: 1800, label: "1440 × 1800 px" },
+  };
 
-const CANVAS_PRESETS: Record<CanvasPreset, { width: number; height: number; label: string }> = {
-  "1920x1080": { width: 1920, height: 1080, label: "1920 × 1080 px" },
-  "1440x1800": { width: 1440, height: 1800, label: "1440 × 1800 px" },
-};
+  const [canvasPreset, setCanvasPreset] = useState<CanvasPreset>("1920x1080");
+  const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset];
 
-const [canvasPreset, setCanvasPreset] = useState<CanvasPreset>("1920x1080");
-
-const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset];
-
-
-
-  /* ---------------- colores / exclusiones ---------------- */
+  /* colors / exclusions */
 
   const handleColorChange = (label: string, color: string) => {
     setCustomColors((prev) => ({ ...prev, [label]: color }));
@@ -280,7 +289,7 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
 
   const resetExclusions = () => setExcludedLabels([]);
 
-  /* ---------------- carga de Google Sheets ---------------- */
+  /* load sheets */
 
   const handleLoadDataset = async (
     url: string,
@@ -306,8 +315,8 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
     setQuestionCell("");
     setAnswerRange("");
     setSecondQuestionCell("");
-    setSecondAnswerRange(""); 
-
+    setSecondAnswerRange("");
+    setMatrixRowOrder([]); // ✅ reset matrix order
 
     try {
       const spreadsheetId = parseSpreadsheetId(url);
@@ -325,67 +334,56 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
           id: index,
         })) || [];
 
-      if (!availableSheets.length) {
-        throw new Error("No se encontraron hojas en este archivo.");
-      }
+      if (!availableSheets.length) throw new Error("No se encontraron hojas");
 
       setSheets(availableSheets);
 
-      const sheetNameToUse =
-        sheetOverride || availableSheets[0].name; 
-
+      const sheetNameToUse = sheetOverride || availableSheets[0].name;
       setSelectedSheet(sheetNameToUse);
 
-      const dataRes =
-        await (window as any).gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: `${sheetNameToUse}!A1:ZZ1000`,
-          valueRenderOption: "UNFORMATTED_VALUE",
-        });
+      const dataRes = await (window as any).gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetNameToUse}!A1:ZZ1000`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
 
       const values = dataRes.result.values || [];
       setSheetValues(values);
 
-    if (!values.length) {
-      setColumns([]);
-      return;
-    }
-    const headerRowIndex = values.findIndex((row: any[]) =>
-      row.some((cell) => cell !== "" && cell != null)
-    );
-    if (headerRowIndex === -1) {
-      setColumns([]);
-      return;
-    }
-    const headers = values[headerRowIndex] || [];
-    const rows = values.slice(headerRowIndex + 1);
+      if (!values.length) {
+        setColumns([]);
+        return;
+      }
 
-    const cols: DatasetColumn[] = headers.map(
-      (header: any, colIndex: number) => ({
+      const headerRowIndex = values.findIndex((row: any[]) =>
+        row.some((cell) => cell !== "" && cell != null)
+      );
+      if (headerRowIndex === -1) {
+        setColumns([]);
+        return;
+      }
+
+      const headers = values[headerRowIndex] || [];
+      const rows = values.slice(headerRowIndex + 1);
+
+      const cols: DatasetColumn[] = headers.map((header: any, colIndex: number) => ({
         name: String(header || `Columna ${colIndex + 1}`),
         values: rows.map((row: any[]) => String(row[colIndex] ?? "")),
-      })
-    );
+      }));
 
-    setColumns(cols);
-        } catch (error) {
-          console.error("Error loading spreadsheet:", error);
-          alert("Failed to load spreadsheet. Check console for details.");
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-
-  /* ---------------- handlers UI ---------------- */
-
-  const handleColumnSelect = (columnName: string) => {
-    setSelectedColumn(columnName);
+      setColumns(cols);
+    } catch (error) {
+      console.error("Error loading spreadsheet:", error);
+      alert("Failed to load spreadsheet.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSecondColumnSelect = (columnName: string) => {
-    setSelectedSecondColumn(columnName);
-  };
+  /* handlers */
+
+  const handleColumnSelect = (columnName: string) => setSelectedColumn(columnName);
+  const handleSecondColumnSelect = (columnName: string) => setSelectedSecondColumn(columnName);
 
   const handleSheetSelect = (sheetName: string) => {
     setSelectedSheet(sheetName);
@@ -394,19 +392,16 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
     }
   };
 
-  /* ---------------- cálculo de frecuencias ---------------- */
+  /* ✅ useEffect MODIFICADO: frecuencias + matrix row order */
   useEffect(() => {
-    // MODO BASE DE DATOS (raw): igual que antes
+    // RAW
     if (inputMode === "raw") {
       if (!selectedColumn) {
         setFrequencies([]);
         return;
       }
 
-      let freqs: FrequencyData[] = calculateRawFrequencies(
-        columns,
-        selectedColumn
-      );
+      let freqs: FrequencyData[] = calculateRawFrequencies(columns, selectedColumn);
 
       if (chartType === "tracking") {
         const seen = new Set<string>();
@@ -420,21 +415,34 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
 
       setExcludedLabels([]);
       setFrequencies(freqs);
+
+      if (chartType === "matrix") setMatrixRowOrder([]);
       return;
     }
 
-    // MODO TABLA DE RESULTADOS (summary): usamos celda + rango
+    // SUMMARY
     if (!answerRange || !sheetValues.length) {
       setFrequencies([]);
       return;
     }
 
     let freqs: FrequencyData[] =
-  chartType === "singletrack"
-    ? buildSingleTrackFromRange(sheetValues, answerRange)
-    : buildSummaryFrequenciesFromRange(sheetValues, answerRange);
+      chartType === "singletrack"
+        ? buildSingleTrackFromRange(sheetValues, answerRange)
+        : chartType === "matrix"
+        ? buildMatrixFrequencies(sheetValues, answerRange)
+        : buildSummaryFrequenciesFromRange(sheetValues, answerRange);
+        if (chartType === "matrix") {
+        const rowLabels = buildMatrixRowLabels(sheetValues, answerRange);
+          setMatrixRowOrder((prev) => {
+            if (!prev.length) return rowLabels;
 
+            const stillValid = prev.every((x) => rowLabels.includes(x));
+            if (!stillValid) return rowLabels;
 
+            return prev;
+          });
+        }
     if (chartType === "tracking") {
       const seen = new Set<string>();
       freqs = freqs.filter((f) => {
@@ -449,7 +457,6 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
     setFrequencies(freqs);
   }, [inputMode, selectedColumn, columns, chartType, answerRange, sheetValues]);
 
-
   useEffect(() => {
     if (frequencies.length === 0) return;
 
@@ -462,30 +469,28 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
     const updated = ordered
       .filter((o) => byLabel.has(o.label))
       .map((o) => ({ ...o, ...byLabel.get(o.label)! }));
+
     setOrdered(updated);
   }, [frequencies]);
 
   const adjustedFrequencies: FrequencyData[] = useMemo(() => {
-  const remaining = frequencies.filter(
-    (f) => !excludedLabels.includes(f.label)
-  );
+    if (chartType === "matrix") return frequencies;
+    const remaining = frequencies.filter((f) => !excludedLabels.includes(f.label));
 
-  if (inputMode === "summary") {
+    if (inputMode === "summary") {
+      return remaining.map((f) => ({
+        ...f,
+        percentage: Number(f.percentage.toFixed(1)),
+        value: f.value,
+      }));
+    }
+
+    const remTotal = remaining.reduce((s, f) => s + f.value, 0);
     return remaining.map((f) => ({
       ...f,
-      percentage: Number(f.percentage.toFixed(1)), 
-      value: f.value, 
+      percentage: remTotal > 0 ? Number(((f.value / remTotal) * 100).toFixed(1)) : 0,
     }));
-  }
-
-  const remTotal = remaining.reduce((s, f) => s + f.value, 0);
-  return remaining.map((f) => ({
-    ...f,
-    percentage:
-      remTotal > 0 ? Number(((f.value / remTotal) * 100).toFixed(1)) : 0,
-  }));
-}, [frequencies, excludedLabels, inputMode]);
-
+  }, [frequencies, excludedLabels, inputMode]);
 
   const adjustedPercentages: Record<string, number> = useMemo(() => {
     const m: Record<string, number> = {};
@@ -495,142 +500,111 @@ const { width: canvasWidth, height: canvasHeight } = CANVAS_PRESETS[canvasPreset
     return m;
   }, [adjustedFrequencies]);
 
-const dataForChart: FrequencyData[] = useMemo(() => {
-  if (adjustedFrequencies.length === 0) return [];
+  const dataForChart: FrequencyData[] = useMemo(() => {
+    if (adjustedFrequencies.length === 0) return [];
 
-  const guide = ordered
-    .map((f) => f.label)
-    .filter((l) => !excludedLabels.includes(l));
+    const guide = ordered.map((f) => f.label).filter((l) => !excludedLabels.includes(l));
 
-  const byLabel = new Map(adjustedFrequencies.map((f) => [f.label, f]));
-  const orderedPart = guide
-    .map((label) => byLabel.get(label))
-    .filter((x): x is FrequencyData => Boolean(x));
+    const byLabel = new Map(adjustedFrequencies.map((f) => [f.label, f]));
+    const orderedPart = guide
+      .map((label) => byLabel.get(label))
+      .filter((x): x is FrequencyData => Boolean(x));
 
-  const inGuide = new Set(guide);
-  const leftovers = adjustedFrequencies.filter((f) => !inGuide.has(f.label));
+    const inGuide = new Set(guide);
+    const leftovers = adjustedFrequencies.filter((f) => !inGuide.has(f.label));
 
-  return [...orderedPart, ...leftovers];
-}, [ordered, excludedLabels, adjustedFrequencies]);
+    return [...orderedPart, ...leftovers];
+  }, [ordered, excludedLabels, adjustedFrequencies]);
 
-const labelOrder = useMemo(
-  () => dataForChart.map((f) => f.label),
-  [dataForChart]
-);
+  const labelOrder = useMemo(() => dataForChart.map((f) => f.label), [dataForChart]);
 
-    /* ---------------- export queue: guardar y bajar ZIP ---------------- */
+  /* Add to queue */
 
   const handleAddToQueue = () => {
-  if (!selectedColumn) return;
+    if (!selectedColumn) return;
 
-  if (chartType === "stacked") {
-    if (inputMode === "raw") {
-      // En modo raw sí exigimos columnas apiladas
-      if (!stackedColumns.length) return;
+    if (chartType === "stacked") {
+      if (inputMode === "raw") {
+        if (!stackedColumns.length) return;
+      } else {
+        if (!stackedRangesSummary.trim()) return;
+      }
     } else {
-      // En modo summary pedimos que haya rangos definidos
-      if (!stackedRangesSummary.trim()) return;
+      if (dataForChart.length === 0) return;
     }
-  } else {
-    // Para el resto de tipos exigimos datos calculados
-    if (dataForChart.length === 0) return;
-  }
 
-  const builder = chartSvgBuilders[chartType];
-  if (!builder) return;
+    const builder = chartSvgBuilders[chartType];
+    if (!builder) return;
 
-  const svg = builder({
-    data: dataForChart,
-    title: selectedColumn,
-    secondColumn: selectedSecondColumn,
-    columns,
-    customColors,
-    stackedColumns,
-    sheetTitle: selectedSheet,
-    width: canvasWidth,
-    height: canvasHeight,
-    inputMode,
-    labelOrder,
-    sheetValues,
-    stackedLabelCells,
-    stackedRangesSummary,
-    answerRange,
-    backgroundColor: previewBg,
-    textColor: previewTextColor,
-    secondAnswerRange,
-    brand: brand ?? "poligrama", 
-  });
+    const svg = builder({
+      data: dataForChart,
+      title: selectedColumn,
+      secondColumn: selectedSecondColumn,
+      columns,
+      customColors,
+      stackedColumns,
+      sheetTitle: selectedSheet,
+      width: canvasWidth,
+      height: canvasHeight,
+      inputMode,
+      labelOrder,
+      matrixRowOrder, 
+      sheetValues,
+      stackedLabelCells,
+      stackedRangesSummary,
+      answerRange,
+      backgroundColor: previewBg,
+      textColor: previewTextColor,
+      secondAnswerRange,
+      brand: brand ?? "poligrama",
+      questionCell,
+    });
 
-  addChart({
-    title: selectedColumn,
-    chartType,
-    svg,
-  });
-};
+    addChart({
+      title: selectedColumn,
+      chartType,
+      svg,
+    });
+  };
 
+  const canShowPreview = useMemo(() => {
+    if (!selectedColumn) return false;
 
-const canShowPreview = useMemo(() => {
-  if (!selectedColumn) return false;
-
-  if (chartType === "stacked") {
-    if (inputMode === "raw") {
-      return stackedColumns.length > 0;
+    if (chartType === "stacked") {
+      if (inputMode === "raw") return stackedColumns.length > 0;
+      return stackedRangesSummary.trim().length > 0;
     }
-    // summary: mostramos si hay al menos un rango definido
-    return stackedRangesSummary.trim().length > 0;
-  }
 
-  return dataForChart.length > 0;
-}, [
-  chartType,
-  selectedColumn,
-  stackedColumns,
-  dataForChart,
-  inputMode,
-  stackedRangesSummary,
-]);
+    return dataForChart.length > 0;
+  }, [chartType, selectedColumn, stackedColumns, dataForChart, inputMode, stackedRangesSummary]);
 
+  /* Render */
 
+  if (!brand) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full space-y-6">
+          <h1 className="text-2xl font-semibold text-center">
+            ¿Con qué marca vas a trabajar?
+          </h1>
 
-  /* ------------------------------------------------------------------
-   * Render
-   * ------------------------------------------------------------------ */
-    if (!brand) {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-background">
-      <div className="max-w-md w-full space-y-6">
-        <h1 className="text-2xl font-semibold text-center">
-          ¿Con qué marca vas a trabajar?
-        </h1>
+          <div className="grid gap-4">
+            <Button onClick={() => handleBrandSelect("poligrama")} className="w-full">
+              Poligrama
+            </Button>
 
-        <div className="grid gap-4">
-          <Button
-            onClick={() => handleBrandSelect("poligrama")}
-            className="w-full"
-          >
-            Poligrama
-          </Button>
+            <Button variant="outline" onClick={() => handleBrandSelect("deskover")} className="w-full">
+              Deskover
+            </Button>
 
-          <Button
-            variant="outline"
-            onClick={() => handleBrandSelect("deskover")}
-            className="w-full"
-          >
-            Deskover
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => handleBrandSelect("censEdmundSinsa")}
-            className="w-full"
-          >
-            Cens / Edmund / Sinsa
-          </Button>
+            <Button variant="outline" onClick={() => handleBrandSelect("censEdmundSinsa")} className="w-full">
+              Cens / Edmund / Sinsa
+            </Button>
+          </div>
         </div>
-      </div>
-    </main>
-  );
-}
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -641,9 +615,7 @@ const canShowPreview = useMemo(() => {
           </h1>
         </div>
 
-
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Columna izquierda – controles */}
           <div className="space-y-6">
             <GoogleAuth onAuthSuccess={(token) => setAuthToken(token)} />
 
@@ -660,7 +632,6 @@ const canShowPreview = useMemo(() => {
               onPreviewBgChange={setPreviewBg}
               onPreviewTextColorChange={setPreviewTextColor}
               brand={brand ?? "poligrama"}
-
             />
 
             {columns.length > 0 && (
@@ -691,31 +662,42 @@ const canShowPreview = useMemo(() => {
                   onStackedLabelCellsChange={setStackedLabelCells}
                   stackedRangesSummary={stackedRangesSummary}
                   onStackedRangesSummaryChange={setStackedRangesSummary}
-                sheetValues={sheetValues}
+                  sheetValues={sheetValues}
                 />
 
-                {/* Columna de % cuando usas tabla de resultados */}
-                {adjustedFrequencies.length > 0 && (
+                {/* ✅ Drag list */}
+                {(chartType === "matrix" ? matrixRowOrder.length > 0 : adjustedFrequencies.length > 0) && (
                   <div className="mt-4">
                     <h3 className="mb-2 text-sm font-medium text-foreground">
                       Orden de respuestas
                     </h3>
+
                     <DragList
-                      items={dataForChart.map((f) => ({
-                        id: f.label,
-                        label: f.label,
-                        percentage: f.percentage,
-                        color: customColors[f.label],
-                      }))}
+                    showPercentage={chartType !== "matrix"}
+                      items={
+                        chartType === "matrix"
+                          ? matrixRowOrder.map((label) => ({
+                              id: label,
+                              label,
+                              color: customColors[label],
+                            }))
+                          : dataForChart.map((f) => ({
+                              id: f.label,
+                              label: f.label,
+                              percentage: f.percentage,
+                              color: customColors[f.label],
+                            }))
+                      }
                       onReorder={(next) => {
-                        const byLabel = new Map(
-                          frequencies.map((f) => [f.label, f])
-                        );
+                        if (chartType === "matrix") {
+                          setMatrixRowOrder(next.map((n) => n.id));
+                          return;
+                        }
+
+                        const byLabel = new Map(frequencies.map((f) => [f.label, f]));
                         const newOrdered = next
                           .map((n) => byLabel.get(n.id))
-                          .filter(
-                            (x): x is FrequencyData => Boolean(x)
-                          );
+                          .filter((x): x is FrequencyData => Boolean(x));
                         setOrdered(newOrdered);
                       }}
                     />
@@ -723,74 +705,67 @@ const canShowPreview = useMemo(() => {
                 )}
 
                 <ChartTypeSelector
-                chartType={chartType}
-                onSelect={setChartType}
-                showMatrixOption={columns.length > 1}
-                onSecondColumnSelect={handleSecondColumnSelect}
-                columns={columns}
-                selectedSecondColumn={selectedSecondColumn}
-                inputMode={inputMode}                         
-                secondQuestionCell={secondQuestionCell}         
-                onSecondQuestionCellChange={setSecondQuestionCell}
-                secondAnswerRange={secondAnswerRange}             
-                onSecondAnswerRangeChange={setSecondAnswerRange}
-                sheetValues={sheetValues}
-                brand={brand ?? "poligrama"}  
-              />
+                  chartType={chartType}
+                  onSelect={setChartType}
+                  showMatrixOption={columns.length > 1}
+                  onSecondColumnSelect={handleSecondColumnSelect}
+                  columns={columns}
+                  selectedSecondColumn={selectedSecondColumn}
+                  inputMode={inputMode}
+                  secondQuestionCell={secondQuestionCell}
+                  onSecondQuestionCellChange={setSecondQuestionCell}
+                  secondAnswerRange={secondAnswerRange}
+                  onSecondAnswerRangeChange={setSecondAnswerRange}
+                  sheetValues={sheetValues}
+                  brand={brand ?? "poligrama"}
+                />
               </>
             )}
           </div>
 
-          {/* Columna derecha – preview */}
           <div className="lg:sticky lg:top-8 lg:self-start space-y-4">
+            {canShowPreview && (
+              <ChartPreview
+                chartType={chartType}
+                data={dataForChart}
+                title={selectedColumn}
+                secondColumn={selectedSecondColumn}
+                columns={columns}
+                customColors={customColors}
+                onAddToQueue={handleAddToQueue}
+                onDownloadZip={downloadZip}
+                batchCount={items.length}
+                stackedColumns={stackedColumns}
+                sheetTitle={selectedSheet}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
+                inputMode={inputMode}
+                labelOrder={labelOrder}
+                matrixRowOrder={matrixRowOrder} // ✅ PASAR A PREVIEW TAMBIÉN
+                sheetValues={sheetValues}
+                secondAnswerRange={secondAnswerRange}
+                stackedLabelCells={stackedLabelCells}
+                stackedRangesSummary={stackedRangesSummary}
+                answerRange={answerRange}
+                questionCell={questionCell}
+                previewBg={previewBg}
+                previewTextColor={previewTextColor}
+                brand={brand ?? "poligrama"}
+              />
+            )}
 
-          {canShowPreview && (
-          <ChartPreview
-            chartType={chartType}
-            data={dataForChart}
-            title={selectedColumn}
-            secondColumn={selectedSecondColumn}
-            columns={columns}
-            customColors={customColors}
-            onAddToQueue={handleAddToQueue}
-            onDownloadZip={downloadZip}
-            batchCount={items.length}
-            stackedColumns={stackedColumns}
-            sheetTitle={selectedSheet}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            inputMode={inputMode}
-            labelOrder={labelOrder}
-            sheetValues={sheetValues}    
-            secondAnswerRange= {secondAnswerRange}
-            stackedLabelCells={stackedLabelCells}
-            stackedRangesSummary={stackedRangesSummary}
-            answerRange={answerRange}
-            previewBg={previewBg}
-            previewTextColor={previewTextColor}
-            brand={brand ?? "poligrama"}
-          />
-        )}
-
-
-          {/* SIEMPRE mostrar el resumen del lote aunque no haya gráfica */}
-          {items.length > 0 && (
-            <div className="p-4 border rounded bg-muted/20">
-              <h3 className="text-sm font-medium">
-                Gráficas en lote: {items.length}
-              </h3>
-              <button
-                onClick={downloadZip}
-                className="mt-2 px-4 py-2 rounded bg-primary text-white"
-              >
-                Descargar ZIP
-              </button>
-            </div>
-          )}
-
-        </div>
-
-
+            {items.length > 0 && (
+              <div className="p-4 border rounded bg-muted/20">
+                <h3 className="text-sm font-medium">Gráficas en lote: {items.length}</h3>
+                <button
+                  onClick={downloadZip}
+                  className="mt-2 px-4 py-2 rounded bg-primary text-white"
+                >
+                  Descargar ZIP
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>

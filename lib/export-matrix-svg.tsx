@@ -6,14 +6,12 @@ const CANVAS_H = 1080;
 const FONT_STACK =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
-// ESCAPAR TEXTO
 const esc = (s?: string | null) =>
   (s ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-// WRAP DE LABELS
 function wrapMatrixLabel(text: string, maxChars = 18): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
@@ -30,15 +28,18 @@ function wrapMatrixLabel(text: string, maxChars = 18): string[] {
   }
 
   if (current) lines.push(current);
-
   if (lines.length > 2) return [lines[0], lines.slice(1).join(" ")];
-
   return lines;
 }
 
-// PARSE %
 function parsePercentToNumber(raw: any): number {
   if (raw == null) return 0;
+  if (typeof raw === "number") {
+    let n = raw;
+    if (n > 0 && n <= 1) n = n * 100;
+    return n;
+  }
+
   const s = String(raw).trim();
   if (!s) return 0;
 
@@ -47,11 +48,9 @@ function parsePercentToNumber(raw: any): number {
   if (Number.isNaN(num)) return 0;
 
   if (num >= 0 && num <= 1) return num * 100;
-
   return num;
 }
 
-// TITLES
 function prepareTitle(title: string, baseFontSize: number, maxChars = 115) {
   const words = title.split(/\s+/);
   const lines: string[] = [];
@@ -78,8 +77,11 @@ function prepareTitle(title: string, baseFontSize: number, maxChars = 115) {
   };
 }
 
-// COLOR CELDA
-function cellFill(rowLabel: string, percent: number, customColors?: Record<string, string>) {
+function cellFill(
+  rowLabel: string,
+  percent: number,
+  customColors?: Record<string, string>
+) {
   const fallback = ChartConfig.colors.matrix.light;
   const baseHex = customColors?.[rowLabel] ?? fallback;
   const clamped = Math.max(0, Math.min(100, percent));
@@ -87,8 +89,7 @@ function cellFill(rowLabel: string, percent: number, customColors?: Record<strin
   return { baseHex, alpha };
 }
 
-// ---------------- A1 HELPERS ----------------
-// Ya NO truenan si escribes "C" o "C1:".
+/* ---------------- A1 helpers ---------------- */
 
 function a1ToRowCol(a1: string) {
   const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
@@ -107,7 +108,7 @@ function parseA1Range(range: string) {
 
   const [a, b] = range.trim().split(":");
   const start = a1ToRowCol(a);
-  if (!start) return null; // referencia incompleta
+  if (!start) return null;
 
   const end = b ? a1ToRowCol(b) ?? start : start;
 
@@ -119,26 +120,20 @@ function parseA1Range(range: string) {
   };
 }
 
-// ---------------------------------------------
-// SVG PRINCIPAL
-// ---------------------------------------------
-
 export function buildMatrixSvg({
-  data,
   title,
-  secondColumn,
-  columns,
   customColors = {},
   sheetTitle,
   width,
   height,
   inputMode,
   sheetValues,
-  secondAnswerRange,
+  answerRange,
+  questionCell,
   backgroundColor,
   textColor,
+  matrixRowOrder,
 }: ChartSvgArgs): string {
-
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
@@ -165,246 +160,208 @@ export function buildMatrixSvg({
   const titleY = marginTop + 130;
   const lineY = titleY + titleH + 16;
 
-  // DATA
-  let rowOrder: string[] = [];
-  let col2Labels: string[] = [];
-  let matrix: Record<string, Record<string, number>> = {};
+  /* --------------------- SUMMARY MODE: READ MATRIX FROM SHEET --------------------- */
 
-  // --------------------- SUMMARY MODE ---------------------
-
-  if (inputMode === "summary") {
-    if (!sheetValues || !secondAnswerRange) {
-      return basicMsg("Define el rango de la segunda pregunta");
-    }
-
-    rowOrder = data.map((d) => d.label);
-    const rowPerc = Object.fromEntries(data.map((d) => [d.label, d.percentage]));
-
-    const parsed = parseA1Range(secondAnswerRange);
-
-    if (!parsed) {
-      return basicMsg("Rango A1 aún no válido");
-    }
-
-    let { rowStart, rowEnd, colStart, colEnd } = parsed;
-
-    if (colEnd < colStart + 1) {
-      return basicMsg("El rango debe tener dos columnas");
-    }
-
-    const labels: string[] = [];
-    const colPct: number[] = [];
-
-    for (let r = rowStart; r <= rowEnd; r++) {
-      const row = sheetValues[r - 1] || [];
-      const label = row[colStart - 1];
-      const pct = row[colStart];
-
-      if (!label) continue;
-
-      labels.push(String(label));
-      colPct.push(parsePercentToNumber(pct));
-    }
-
-    col2Labels = labels;
-
-    matrix = {};
-    rowOrder.forEach((r) => {
-      matrix[r] = {};
-      col2Labels.forEach((c, i) => {
-        matrix[r][c] = Math.round((rowPerc[r] * colPct[i]) / 100);
-      });
-    });
+  if (inputMode !== "summary") {
+    return basicMsg("Matrix ahora solo funciona en modo tabla de resultados.");
   }
 
-  // --------------------- RAW MODE ---------------------
-
-  if (inputMode === "raw") {
-    const col1 = columns?.find((c) => c.name === title);
-    const col2 = columns?.find((c) => c.name === secondColumn);
-
-    if (!col1 || !col2) return basicMsg("Select both columns to generate matrix");
-
-    rowOrder = data.map((d) => d.label);
-    col2Labels = Array.from(new Set(col2.values)).filter(Boolean);
-
-    matrix = {};
-    rowOrder.forEach((r) => {
-      matrix[r] = {};
-      col2Labels.forEach((c) => (matrix[r][c] = 0));
-    });
-
-    col1.values.forEach((v1, i) => {
-      const v2 = col2.values[i];
-      if (v1 && v2 && matrix[v1] && matrix[v1][v2] != null) {
-        matrix[v1][v2]++;
-      }
-    });
-
-    rowOrder.forEach((r) => {
-      const total = Object.values(matrix[r]).reduce((a, b) => a + b, 0);
-      col2Labels.forEach((c) => {
-        matrix[r][c] = total > 0 ? Math.round((matrix[r][c] / total) * 100) : 0;
-      });
-    });
+  if (!sheetValues || !sheetValues.length) {
+    return basicMsg("No hay datos de la hoja.");
   }
 
-  // ------------------- SVG OUTPUT -------------------
+  if (!questionCell || !answerRange) {
+    return basicMsg("Define celda de pregunta y rango de respuestas.");
+  }
 
-const parts: string[] = [];
+  const qPos = a1ToRowCol(questionCell);
+  const parsed = parseA1Range(answerRange);
 
-parts.push(
-  `<?xml version="1.0" encoding="UTF-8"?>`,
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
-  `<rect width="100%" height="100%" fill="${bg}" />`
-);
+  if (!qPos || !parsed) {
+    return basicMsg("Rango o celda inválidos.");
+  }
 
-// Título
-titleLines.forEach((line, i) => {
-  parts.push(
-    `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}"
-      fill="${mainTextColor}" font-size="${titleFs}" font-family="${FONT_STACK}">
-      ${esc(line)}
-    </text>`
-  );
-});
+  const { rowStart, rowEnd, colStart, colEnd } = parsed;
 
-// Línea
-parts.push(
-  `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}"
-    stroke="${mainTextColor}" stroke-width="2"/>`
-);
+  // Headers están en la fila del questionCell, desde colStart..colEnd
+  const headerRow = sheetValues[qPos.row - 1] || [];
+  const col2Labels: string[] = [];
+  for (let c = colStart; c <= colEnd; c++) {
+    const v = headerRow[c - 1];
+    if (v != null && String(v).trim()) col2Labels.push(String(v).trim());
+  }
 
-// ENCABEZADO: Poligrama / Poder / Ganar
-const logoX = W - marginRight;
-const logoY0 = marginTop - 24;
-const headerFs = 40;
-const headerLine = headerFs * 1.1;
+// Row labels están en la columna anterior a colStart, filas rowStart..rowEnd
+const rowOrder: string[] = [];
+const matrix: Record<string, Record<string, number>> = {};
 
-if (sheetTitle) {
-  let sheetTitleY = logoY0 + 40;
-  if (isTall) sheetTitleY = logoY0 + 60;
+for (let r = rowStart; r <= rowEnd; r++) {
+  const row = sheetValues[r - 1] || [];
+  const rowLabelRaw = row[colStart - 2]; // columna previa
+  const rowLabel = rowLabelRaw != null ? String(rowLabelRaw).trim() : "";
+  if (!rowLabel) continue;
 
-  parts.push(
-    `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
-      font-family="${FONT_STACK}" font-size="30" text-anchor="start">
-      ${esc(sheetTitle)}
-    </text>`
-  );
+  rowOrder.push(rowLabel);
+  matrix[rowLabel] = {};
+
+  col2Labels.forEach((colLabel, idx) => {
+    const cellRaw = row[colStart - 1 + idx];
+    matrix[rowLabel][colLabel] = Math.round(parsePercentToNumber(cellRaw));
+  });
 }
 
-parts.push(
-  `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
-    font-size="${headerFs}" font-weight="700" text-anchor="end"
-    font-family="${FONT_STACK}">Poligrama.</text>`,
-  `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
-    font-size="${headerFs}" font-weight="700" text-anchor="end"
-    font-family="${FONT_STACK}">Poder.</text>`,
-  `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
-    font-size="${headerFs}" font-weight="700" text-anchor="end"
-    font-family="${FONT_STACK}">Ganar.</text>`
-);
+const finalRowOrder =
+  matrixRowOrder?.length ? matrixRowOrder : rowOrder;
 
-
-const tableTop = lineY + 60;
-const tableBottom = H - marginBottom - 40;
-const tableHeight = tableBottom - tableTop;
-
-const headerH = 70;
-const rowsH = tableHeight - headerH;
-const rowH = rowsH / rowOrder.length;
-
-const labelColW = 280;
-const dataW = W - marginLeft - marginRight - labelColW;
-const colW = dataW / col2Labels.length;
-
-col2Labels.forEach((label, idx) => {
-  const x = marginLeft + labelColW + idx * colW;
-  const rectY = tableTop + 10;
-  const rectH = headerH - 20;
-
-  parts.push(
-    `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
-      rx="12" fill="#ffffff"/>`,
-    `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000000"
-      font-size="20" font-weight="700" text-anchor="middle"
-      dominant-baseline="middle" font-family="${FONT_STACK}">
-      ${esc(label)}
-    </text>`
-  );
-});
-
-
-// FILAS
-rowOrder.forEach((rowLabel, rowIndex) => {
-  const y = tableTop + headerH + rowIndex * rowH;
-
-  const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
-  const textLines = wrapMatrixLabel(rowLabel);
-
-  parts.push(
-    `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
-      height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
-  );
-
-  const centerX = marginLeft + (labelColW - 16) / 2;
-  const centerY = y + rowH / 2;
-
-  if (textLines.length === 1) {
-    parts.push(
-      `<text x="${centerX}" y="${centerY}" fill="${mainTextColor}"
-        text-anchor="middle" font-size="20" dominant-baseline="middle"
-        font-family="${FONT_STACK}">
-        ${esc(textLines[0])}
-      </text>`
-    );
-  } else {
-    parts.push(
-      `<text x="${centerX}" y="${centerY - 12}" fill="${mainTextColor}"
-        text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
-        ${esc(textLines[0])}
-      </text>`,
-      `<text x="${centerX}" y="${centerY + 12}" fill="${mainTextColor}"
-        text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
-        ${esc(textLines[1])}
-      </text>`
-    );
+  if (!rowOrder.length || !col2Labels.length) {
+    return basicMsg("No se pudo leer la matriz desde el rango.");
   }
 
-  col2Labels.forEach((colLabel, colIndex) => {
-    const cellX = marginLeft + labelColW + colIndex * colW;
-    const pct = matrix[rowLabel][colLabel] ?? 0;
+  /* ------------------- SVG OUTPUT ------------------- */
 
-    const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
+  const parts: string[] = [];
 
+  parts.push(
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    `<rect width="100%" height="100%" fill="${bg}" />`
+  );
+
+  titleLines.forEach((line, i) => {
     parts.push(
-      `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
-        rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
-      `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
-        fill="${mainTextColor}" font-size="20" font-weight="700"
-        text-anchor="middle" dominant-baseline="middle"
-        font-family="${FONT_STACK}">
-        ${pct}%
+      `<text x="${marginLeft}" y="${titleY + i * (titleFs + 6)}"
+        fill="${mainTextColor}" font-size="${titleFs}" font-family="${FONT_STACK}">
+        ${esc(line)}
       </text>`
     );
   });
-});
 
-// FOOTER
-parts.push(
-  `<text x="${W - marginRight}" y="${H - marginBottom}"
-    fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end"
-    font-family="${FONT_STACK}">
-    ${esc(ChartConfig.footer)}
-  </text>`
-);
+  parts.push(
+    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}"
+      stroke="${mainTextColor}" stroke-width="2"/>`
+  );
 
-parts.push(`</svg>`);
+  const logoX = W - marginRight;
+  const logoY0 = marginTop - 24;
+  const headerFs = 40;
+  const headerLine = headerFs * 1.1;
 
-return parts.join("\n");
+  if (sheetTitle) {
+    let sheetTitleY = logoY0 + 40;
+    if (isTall) sheetTitleY = logoY0 + 60;
+
+    parts.push(
+      `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
+        font-family="${FONT_STACK}" font-size="30" text-anchor="start">
+        ${esc(sheetTitle)}
+      </text>`
+    );
+  }
+
+  parts.push(
+    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end"
+      font-family="${FONT_STACK}">Poligrama.</text>`,
+    `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end"
+      font-family="${FONT_STACK}">Poder.</text>`,
+    `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
+      font-size="${headerFs}" font-weight="700" text-anchor="end"
+      font-family="${FONT_STACK}">Ganar.</text>`
+  );
+
+  const tableTop = lineY + 60;
+  const tableBottom = H - marginBottom - 40;
+  const tableHeight = tableBottom - tableTop;
+
+  const headerH = 70;
+  const rowsH = tableHeight - headerH;
+  const rowH = rowsH / finalRowOrder.length;
+  const labelColW = 280;
+  const dataW = W - marginLeft - marginRight - labelColW;
+  const colW = dataW / col2Labels.length;
+
+  col2Labels.forEach((label, idx) => {
+    const x = marginLeft + labelColW + idx * colW;
+    const rectY = tableTop + 10;
+    const rectH = headerH - 20;
+
+    parts.push(
+      `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
+        rx="12" fill="#ffffff"/>`,
+      `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000000"
+        font-size="20" font-weight="700" text-anchor="middle"
+        dominant-baseline="middle" font-family="${FONT_STACK}">
+        ${esc(label)}
+      </text>`
+    );
+  });
+
+  finalRowOrder.forEach((rowLabel, rowIndex) => {
+    const y = tableTop + headerH + rowIndex * rowH;
+
+    const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
+    const textLines = wrapMatrixLabel(rowLabel);
+
+    parts.push(
+      `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
+        height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
+    );
+
+    const centerX = marginLeft + (labelColW - 16) / 2;
+    const centerY = y + rowH / 2;
+
+    if (textLines.length === 1) {
+      parts.push(
+        `<text x="${centerX}" y="${centerY}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20" dominant-baseline="middle"
+          font-family="${FONT_STACK}">
+          ${esc(textLines[0])}
+        </text>`
+      );
+    } else {
+      parts.push(
+        `<text x="${centerX}" y="${centerY - 12}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
+          ${esc(textLines[0])}
+        </text>`,
+        `<text x="${centerX}" y="${centerY + 12}" fill="${mainTextColor}"
+          text-anchor="middle" font-size="20" font-family="${FONT_STACK}">
+          ${esc(textLines[1])}
+        </text>`
+      );
+    }
+
+    col2Labels.forEach((colLabel, colIndex) => {
+      const cellX = marginLeft + labelColW + colIndex * colW;
+      const pct = matrix[rowLabel][colLabel] ?? 0;
+
+      const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
+
+      parts.push(
+        `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
+          rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
+        `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
+          fill="${mainTextColor}" font-size="20" font-weight="700"
+          text-anchor="middle" dominant-baseline="middle"
+          font-family="${FONT_STACK}">
+          ${pct}%
+        </text>`
+      );
+    });
+  });
+
+  parts.push(
+    `<text x="${W - marginRight}" y="${H - marginBottom}"
+      fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end"
+      font-family="${FONT_STACK}">
+      ${esc(ChartConfig.footer)}
+    </text>`
+  );
+
+  parts.push(`</svg>`);
+  return parts.join("\n");
 }
-
-// ------------- MENSAJE SVG SIN CRASH -------------
 
 function basicMsg(message: string) {
   return `

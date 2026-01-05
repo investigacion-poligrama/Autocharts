@@ -1,6 +1,5 @@
 import { ChartConfig } from "@/lib/chartconfig";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
-import type { DatasetColumn } from "@/app/page";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
@@ -42,15 +41,13 @@ function prepareTitle(
   baseFontSize: number,
   maxChars = 115
 ): WrappedTitle {
-  const MAX_CHARS = maxChars;
-
   const words = title.split(/\s+/);
   const lines: string[] = [];
   let current = "";
 
   for (const w of words) {
     const test = current ? current + " " + w : w;
-    if (test.length > MAX_CHARS && current) {
+    if (test.length > maxChars && current) {
       lines.push(current);
       current = w;
     } else {
@@ -63,6 +60,7 @@ function prepareTitle(
   if (lines.length > 2) {
     finalLines = [lines[0], lines.slice(1).join(" ")];
   }
+
   const fs = baseFontSize;
   const lineGap = 6;
 
@@ -83,10 +81,7 @@ const mdKeyFor = (label: string) => {
   return "neutral";
 };
 
-const mdColorFor = (
-  label: string,
-  customColors?: Record<string, string>
-) => {
+const mdColorFor = (label: string, customColors?: Record<string, string>) => {
   if (customColors?.[label]) return customColors[label];
 
   const key = mdKeyFor(label);
@@ -94,105 +89,6 @@ const mdColorFor = (
   if (key === "danger") return ChartConfig.colors.danger;
   return ChartConfig.colors.neutral;
 };
-
-/* ------------------------------------------------------------------ */
-/*   Modo RAW: comparativa con microdatos                             */
-/* ------------------------------------------------------------------ */
-
-function extractComparativeDataOrdered(
-  mainColumn: string,
-  secondColumn: string,
-  columns: DatasetColumn[],
-  orderedLabels: string[]
-) {
-  const col1 = columns.find((c) => c.name === mainColumn);
-  const col2 = columns.find((c) => c.name === secondColumn);
-
-  if (!col1 || !col2) {
-    return { headers: ["Total"], rowData: {} as Record<string, number[]> };
-  }
-
-  const uniqueGroups = Array.from(new Set(col2.values)).filter(Boolean);
-  // headers internos: ["Total", ...grupos]
-  const headers = ["Total", ...uniqueGroups];
-
-  const rowData: Record<string, number[]> = {};
-  orderedLabels.forEach((label) => (rowData[label] = []));
-
-  // Total municipal
-  const mainCounts: Record<string, number> = {};
-  let mainTotal = 0;
-  col1.values.forEach((v) => {
-    if (!v) return;
-    if (!Object.prototype.hasOwnProperty.call(rowData, v)) return;
-    mainCounts[v] = (mainCounts[v] || 0) + 1;
-    mainTotal++;
-  });
-
-  orderedLabels.forEach((label) => {
-    const c = mainCounts[label] || 0;
-    rowData[label].push(
-      mainTotal > 0 ? Math.round((c / mainTotal) * 100) : 0
-    );
-  });
-
-  // Grupos
-  uniqueGroups.forEach((g) => {
-    const groupCounts: Record<string, number> = {};
-    let groupTotal = 0;
-    col1.values.forEach((v1, i) => {
-      const v2 = col2.values[i];
-      if (v2 !== g) return;
-      if (!v1) return;
-      if (!Object.prototype.hasOwnProperty.call(rowData, v1)) return;
-      groupCounts[v1] = (groupCounts[v1] || 0) + 1;
-      groupTotal++;
-    });
-
-    orderedLabels.forEach((label) => {
-      const c = groupCounts[label] || 0;
-      rowData[label].push(
-        groupTotal > 0 ? Math.round((c / groupTotal) * 100) : 0
-      );
-    });
-  });
-
-  return { headers, rowData };
-}
-
-/* ------------------------------------------------------------------ */
-/*   Helpers para SUMMARY: leer segunda pregunta desde la hoja        */
-/* ------------------------------------------------------------------ */
-
-function a1ToRowCol(a1: string) {
-  const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
-  if (!match) {
-    throw new Error(`Referencia A1 inválida: ${a1}`);
-  }
-  const [, colLetters, rowStr] = match;
-  let col = 0;
-  for (const ch of colLetters) {
-    col = col * 26 + (ch.charCodeAt(0) - 64); // A=1, B=2...
-  }
-  const row = parseInt(rowStr, 10);
-  if (!row || row < 1) {
-    throw new Error(`Fila inválida en referencia A1: ${a1}`);
-  }
-  return { row, col }; // 1-based
-}
-
-function parseA1Range(range: string) {
-  const [startStr, endStr] = range.split(":");
-  const start = a1ToRowCol(startStr);
-  const end = endStr ? a1ToRowCol(endStr) : start;
-
-  return {
-    rowStart: Math.min(start.row, end.row),
-    rowEnd: Math.max(start.row, end.row),
-    colStart: Math.min(start.col, end.col),
-    colEnd: Math.max(start.col, end.col),
-  };
-}
 
 function parsePercentCell(raw: any): number {
   if (raw == null) return 0;
@@ -203,6 +99,7 @@ function parsePercentCell(raw: any): number {
   }
   const s = String(raw).trim();
   if (!s) return 0;
+
   const cleaned = s.replace("%", "").replace(",", ".").trim();
   const n = Number(cleaned);
   if (Number.isNaN(n)) return 0;
@@ -210,46 +107,34 @@ function parsePercentCell(raw: any): number {
   return n;
 }
 
-/**
- * Lee la tabla de resultados de la segunda pregunta a partir de
- * `sheetValues` + `secondAnswerRange`. Se asume formato:
- *   [etiqueta, porcentaje]
- */
-function buildSecondQuestionSummaryFromRange(
-  sheetValues: any[][],
-  secondAnswerRange: string
-): { headers: string[]; percents: number[] } {
-  if (!secondAnswerRange.trim() || !sheetValues.length) {
-    return { headers: [], percents: [] };
-  }
+/* ---------------- A1 helpers ---------------- */
 
-  let parsed;
-  try {
-    parsed = parseA1Range(secondAnswerRange.trim());
-  } catch {
-    return { headers: [], percents: [] };
-  }
+function a1ToRowCol(a1: string) {
+  const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if (!match) return null;
+  const [, colLetters, rowStr] = match;
 
-  const { rowStart, rowEnd, colStart } = parsed;
-  if (rowEnd < rowStart) return { headers: [], percents: [] };
+  let col = 0;
+  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
 
-  const headers: string[] = [];
-  const percents: number[] = [];
+  return { row: Number(rowStr), col };
+}
 
-  for (let r = rowStart; r <= rowEnd; r++) {
-    const row = sheetValues[r - 1] || [];
-    const rawLabel = row[colStart - 1];
-    const rawPercent = row[colStart]; // segunda col del rango
+function parseA1Range(range: string) {
+  if (!range.trim()) return null;
 
-    const label = rawLabel != null ? String(rawLabel).trim() : "";
-    if (!label) continue;
+  const [a, b] = range.trim().split(":");
+  const start = a1ToRowCol(a);
+  if (!start) return null;
 
-    const p = parsePercentCell(rawPercent);
-    headers.push(label);
-    percents.push(p);
-  }
+  const end = b ? a1ToRowCol(b) ?? start : start;
 
-  return { headers, percents };
+  return {
+    rowStart: Math.min(start.row, end.row),
+    rowEnd: Math.max(start.row, end.row),
+    colStart: Math.min(start.col, end.col),
+    colEnd: Math.max(start.col, end.col),
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,8 +144,6 @@ function buildSecondQuestionSummaryFromRange(
 export function buildMediumDonutSvg({
   data,
   title,
-  secondColumn,
-  columns,
   customColors = {},
   sheetTitle,
   width,
@@ -268,7 +151,8 @@ export function buildMediumDonutSvg({
   labelOrder,
   inputMode,
   sheetValues,
-  secondAnswerRange,
+  answerRange,
+  questionCell,
   backgroundColor,
   textColor,
 }: ChartSvgArgs): string {
@@ -330,78 +214,83 @@ export function buildMediumDonutSvg({
       ? labelOrder.filter((l) => safeData.some((d) => d.label === l))
       : safeData.map((d) => d.label);
 
-  // ------------------------ headers + rowData ------------------------
+  /* ------------------------------------------------------------------ */
+  /* SUMMARY MODE: tabla comparativa desde sheet (SIN cálculos)         */
+  /* ------------------------------------------------------------------ */
 
   let headers: string[] = [];
   let rowData: Record<string, number[]> = {};
 
-  if (inputMode === "raw") {
-    // modo base de datos → usa columnas de microdatos
-    if (!columns || !secondColumn) {
-      return basicMediumDonutMessageSvg(
-        "Debes seleccionar la segunda columna para la comparativa",
-        bg,
-        mainTextColor
-      );
-    }
-
-    ({ headers, rowData } = extractComparativeDataOrdered(
-      title,
-      secondColumn,
-      columns,
-      orderedLabels
-    ));
-  } else {
-    // modo tabla de resultados: usamos data (P1) y la tabla de % de la segunda pregunta
-    const rowPercents: Record<string, number> = {};
-    safeData.forEach((d) => {
-      rowPercents[d.label] = d.percentage ?? 0;
-    });
-
-    let colHeaders: string[] = [];
-    let colPercents: number[] = [];
-
-    if (sheetValues && secondAnswerRange) {
-      const summary = buildSecondQuestionSummaryFromRange(
-        sheetValues,
-        secondAnswerRange
-      );
-      colHeaders = summary.headers;
-      colPercents = summary.percents;
-    }
-
-    if (!colHeaders.length) {
-      // fallback: sólo columna Total
-      headers = ["Total"];
-      rowData = {};
-      orderedLabels.forEach((label) => {
-        const p1 = rowPercents[label] ?? 0;
-        rowData[label] = [Math.round(p1)];
-      });
-    } else {
-      // columnas = grupos de segunda pregunta + Total
-      headers = [...colHeaders, "Total"];
-      rowData = {};
-
-      orderedLabels.forEach((label) => {
-        const p1 = rowPercents[label] ?? 0;
-        const row: number[] = [];
-
-        colPercents.forEach((p2) => {
-          const joint = (p1 * p2) / 100;
-          row.push(Math.round(joint));
-        });
-
-        row.push(Math.round(p1)); // última columna = Total
-        rowData[label] = row;
-      });
-    }
+  if (inputMode !== "summary") {
+    return basicMediumDonutMessageSvg(
+      "Medium Donut ahora solo funciona en modo tabla de resultados.",
+      bg,
+      mainTextColor
+    );
   }
 
-  // datos para leyenda en el MISMO orden que la dona
+  if (!sheetValues || !sheetValues.length || !questionCell || !answerRange) {
+    return basicMediumDonutMessageSvg(
+      "Define celda de pregunta y rango de respuestas.",
+      bg,
+      mainTextColor
+    );
+  }
+
+  const qPos = a1ToRowCol(questionCell);
+  const parsed = parseA1Range(answerRange);
+
+  if (!qPos || !parsed) {
+    return basicMediumDonutMessageSvg(
+      "Rango o celda inválidos.",
+      bg,
+      mainTextColor
+    );
+  }
+
+  const { rowStart, rowEnd, colStart, colEnd } = parsed;
+
+  // headers en la fila de la pregunta, columnas colStart..colEnd
+  const headerRow = sheetValues[qPos.row - 1] || [];
+  headers = [];
+  for (let c = colStart; c <= colEnd; c++) {
+    const v = headerRow[c - 1];
+    if (v != null && String(v).trim()) headers.push(String(v).trim());
+  }
+
+  // row labels en la columna anterior, filas rowStart..rowEnd
+  rowData = {};
+  orderedLabels.forEach((label) => (rowData[label] = []));
+
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const row = sheetValues[r - 1] || [];
+    const rowLabelRaw = row[colStart - 2];
+    const rowLabel = rowLabelRaw != null ? String(rowLabelRaw).trim() : "";
+    if (!rowLabel) continue;
+
+    if (!rowData[rowLabel]) rowData[rowLabel] = [];
+
+    const values: number[] = [];
+    for (let c = colStart; c <= colEnd; c++) {
+      values.push(Math.round(parsePercentCell(row[c - 1])));
+    }
+    rowData[rowLabel] = values;
+  }
+
+  if (!headers.length) {
+    return basicMediumDonutMessageSvg(
+      "No se encontraron headers en la tabla.",
+      bg,
+      mainTextColor
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* DONA (izquierda)                                                   */
+  /* ------------------------------------------------------------------ */
+
   const legendData = (() => {
     const byLabel = new Map(safeData.map((d) => [d.label, d]));
-
     const fromOrder = orderedLabels
       .map((label) => byLabel.get(label))
       .filter((x): x is (typeof safeData)[number] => Boolean(x));
@@ -412,8 +301,6 @@ export function buildMediumDonutSvg({
     return [...fromOrder, ...leftovers];
   })();
 
-  // ---- Layout general: izquierda (dona+leyenda) / derecha (tabla) ----
-
   const contentTop = lineY + 60;
   const contentBottom = H - marginBottom;
   const leftWidth = isTall1440 ? 520 : 640;
@@ -421,8 +308,6 @@ export function buildMediumDonutSvg({
 
   const rightX0 = marginLeft + leftWidth + gap;
   const rightWidth = W - rightX0 - marginRight;
-
-  /* -------------------- DONA -------------------- */
 
   const donutCx = marginLeft + leftWidth / 2;
   const donutCy = isTall1440 ? H / 2 - 160 : H / 2;
@@ -466,11 +351,13 @@ export function buildMediumDonutSvg({
     `;
 
     donutPaths.push(
-  `<path d="${dPath}" fill="${color}" stroke="${color}" stroke-width="3" />`
-);
+      `<path d="${dPath}" fill="${color}" stroke="${color}" stroke-width="3" />`
+    );
   });
 
-  /* -------------------- LEYENDA -------------------- */
+  /* ------------------------------------------------------------------ */
+  /* LEYENDA                                                            */
+  /* ------------------------------------------------------------------ */
 
   const legendTop = donutCy + outerR + (isTall1440 ? 40 : 90);
   const legendItems = legendData;
@@ -543,7 +430,9 @@ export function buildMediumDonutSvg({
     );
   });
 
-  /* -------------------- TABLA (columna derecha) -------------------- */
+  /* ------------------------------------------------------------------ */
+  /* TABLA DERECHA                                                      */
+  /* ------------------------------------------------------------------ */
 
   const tableTop = contentTop;
   const headerHeight = 60;
@@ -554,50 +443,27 @@ export function buildMediumDonutSvg({
 
   const labels = orderedLabels;
   const rowsCount = labels.length || 1;
-  const rowHeight = Math.max(
-    40,
-    (tableHeight - headerHeight) / rowsCount
-  );
+  const rowHeight = Math.max(40, (tableHeight - headerHeight) / rowsCount);
 
   const labelColWidth = isTall1440 ? 190 : 260;
-
-  // headers visibles
-  let headerLabels: string[] = [];
-  if (inputMode === "raw") {
-    if (headers.length === 0) {
-      headerLabels = ["Total"];
-    } else {
-      const [total, ...groups] = headers;
-      headerLabels = [...groups, total];
-    }
-  } else {
-    headerLabels = headers.length ? headers : ["Total"];
-  }
-
-  const nCols = headerLabels.length;
+  const nCols = headers.length;
   const colWidth = (rightWidth - labelColWidth) / Math.max(nCols, 1);
 
   const tableParts: string[] = [];
 
   // Encabezados
-  headerLabels.forEach((h, idx) => {
+  headers.forEach((h, idx) => {
     const x = rightX0 + labelColWidth + idx * colWidth;
     const rectY = tableTop + 8;
     const rectH = headerHeight - 16;
 
     tableParts.push(
-      `<rect x="${x + 4}" y="${rectY}" width="${
-        colWidth - 8
-      }" height="${rectH}" rx="12" ry="12" fill="${
-        ChartConfig.colors.white
-      }" />`,
-      `<text x="${
-        x + colWidth / 2
-      }" y="${
-        rectY + rectH / 2
-      }" fill="${ChartConfig.colors.black}" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="middle">${esc(
-        h
-      )}</text>`
+      `<rect x="${x + 4}" y="${rectY}" width="${colWidth - 8}" height="${rectH}" rx="12" ry="12" fill="${ChartConfig.colors.white}" />`,
+      `<text x="${x + colWidth / 2}" y="${rectY + rectH / 2}"
+        fill="${ChartConfig.colors.black}" font-family="Helvetica, Arial, sans-serif"
+        font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        ${esc(h)}
+      </text>`
     );
   });
 
@@ -623,70 +489,43 @@ export function buildMediumDonutSvg({
     const line2Y = line1Y + labelFs + lineGap;
 
     tableParts.push(
-      `<rect x="${rightX0}" y="${rectY}" width="${
-        labelColWidth - 16
-      }" height="${rectH}" rx="12" ry="12" fill="${pillBg}" />`,
+      `<rect x="${rightX0}" y="${rectY}" width="${labelColWidth - 16}"
+        height="${rectH}" rx="12" ry="12" fill="${pillBg}" />`,
       `<text x="${centerX}" y="${line1Y}"
-             fill="${pillTextColor}"
-             font-weight="700"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="${labelFs}"
-             text-anchor="middle">
-             ${esc(labelLines[0])}
-       </text>`,
+        fill="${pillTextColor}" font-weight="700"
+        font-family="Helvetica, Arial, sans-serif" font-size="${labelFs}" text-anchor="middle">
+        ${esc(labelLines[0])}
+      </text>`,
       labelLines.length > 1
         ? `<text x="${centerX}" y="${line2Y}"
-                 fill="${pillTextColor}"
-                 font-family="Helvetica, Arial, sans-serif"
-                 font-weight="700"
-                 font-size="${labelFs}"
-                 text-anchor="middle">
-                 ${esc(labelLines[1])}
-           </text>`
+            fill="${pillTextColor}" font-family="Helvetica, Arial, sans-serif"
+            font-weight="700" font-size="${labelFs}" text-anchor="middle">
+            ${esc(labelLines[1])}
+          </text>`
         : ""
     );
 
-    const rawValues = rowData[label] ?? [];
-    let displayValues: number[];
+    const values = rowData[label] ?? [];
 
-    if (inputMode === "raw") {
-      // [Total, g1, g2...] → [g1, g2..., Total]
-      if (rawValues.length === 0) {
-        displayValues = [];
-      } else {
-        const [total, ...groups] = rawValues;
-        displayValues = [...groups, total];
-      }
-    } else {
-      displayValues = rawValues;
-    }
-
-    displayValues.forEach((val, idx) => {
+    values.forEach((val, idx) => {
       const cellX = rightX0 + labelColWidth + idx * colWidth;
 
       tableParts.push(
-        `<rect x="${cellX + 4}" y="${
-          y + 6
-        }" width="${colWidth - 8}" height="${
-          rowHeight - 12
-        }" rx="12" ry="12" fill="${pillBg}" />`,
-        `<text x="${
-          cellX + colWidth / 2
-        }" y="${
-          y + rowHeight / 2
-        }" fill="${pillTextColor}"
-           font-family="Helvetica, Arial, sans-serif"
-           font-size="20"
-           font-weight="700"
-           text-anchor="middle"
-           dominant-baseline="middle">
-           ${val}%
+        `<rect x="${cellX + 4}" y="${y + 6}" width="${colWidth - 8}"
+          height="${rowHeight - 12}" rx="12" ry="12" fill="${pillBg}" />`,
+        `<text x="${cellX + colWidth / 2}" y="${y + rowHeight / 2}"
+          fill="${pillTextColor}" font-family="Helvetica, Arial, sans-serif"
+          font-size="20" font-weight="700" text-anchor="middle"
+          dominant-baseline="middle">
+          ${val}%
         </text>`
       );
     });
   });
 
-  /* -------------------- COMPOSICIÓN GENERAL -------------------- */
+  /* ------------------------------------------------------------------ */
+  /* SVG Output                                                         */
+  /* ------------------------------------------------------------------ */
 
   const parts: string[] = [];
 
@@ -696,7 +535,6 @@ export function buildMediumDonutSvg({
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // Título
   const titleLineGap = 6;
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGap);
@@ -707,26 +545,18 @@ export function buildMediumDonutSvg({
     );
   });
 
-  // Línea
   parts.push(
-    `<line x1="${marginLeft}" y1="${lineY}" x2="${
-      W - marginRight
-    }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
+    `<line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
-  // Poligrama / Poder. / Ganar.
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
   if (sheetTitle) {
     parts.push(
       `<text x="${marginLeft}" y="${logoY0}"
-             fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
-        ${esc(sheetTitle)}
-       </text>`
+        fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif"
+        font-size="30" text-anchor="start">${esc(sheetTitle)}</text>`
     );
   }
 
@@ -740,16 +570,10 @@ export function buildMediumDonutSvg({
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-  // Dona
   parts.push(`<g>`, ...donutPaths, `</g>`);
-
-  // Leyenda
   parts.push(`<g>`, ...legendPills, `</g>`);
-
-  // Tabla
   parts.push(`<g>`, ...tableParts, `</g>`);
 
-  // Footer
   parts.push(
     `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
@@ -757,13 +581,8 @@ export function buildMediumDonutSvg({
   );
 
   parts.push(`</svg>`);
-
   return parts.join("\n");
 }
-
-/* ------------------------------------------------------------------ */
-/*   Mensaje básico si faltan datos                                   */
-/* ------------------------------------------------------------------ */
 
 function basicMediumDonutMessageSvg(
   message: string,
