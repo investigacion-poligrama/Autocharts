@@ -681,15 +681,12 @@ if (!categories.length) {
       // número
       parts.push(
         `<text x="${pt.x}" y="${finalY}"
-        fill="${textColorPoint}"
-        stroke="#000000"
-        stroke-width="2"
-        paint-order="stroke"
-        font-family="Helvetica, Arial, sans-serif"
-        font-size="25" font-weight="700"
-        text-anchor="middle">
-        ${pt.v}%
-      </text>`
+          fill="${textColorPoint}"
+          font-family="Helvetica, Arial, sans-serif"
+          font-size="25" font-weight="700"
+          text-anchor="middle">
+          ${pt.v}%
+        </text>`
       );
     });
   });
