@@ -38,6 +38,10 @@ export interface ChartSvgArgs {
   brand?: Brand;
   questionCell?: string;    
   matrixRowOrder?: string[];
+  combinedCharts?: [
+  { chartType: ChartType; args: ChartSvgArgs; title?: string },
+  { chartType: ChartType; args: ChartSvgArgs; title?: string }
+];
   
 }
 
@@ -59,6 +63,26 @@ function parsePercent(raw: unknown): number {
 
   return Number(n.toFixed(1));
 }
+
+function extractInnerSvg(svg: string) {
+  let inner = svg
+    .replace(/^[\s\S]*?<svg[^>]*>/i, "")
+    .replace(/<\/svg>\s*$/i, "");
+
+  // quita rect background completo
+  inner = inner.replace(
+    /<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i,
+    ""
+  );
+
+  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/i);
+  const viewBox = viewBoxMatch ? viewBoxMatch[1] : null;
+
+  return { inner, viewBox };
+}
+
+
+
 
 /* ------------------------------------------------------------------ */
 /* stacked: modo RAW (base de datos) – tu lógica original             */
@@ -465,4 +489,47 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       brand: args.brand,
       headerLeftLabel: "Monterrey, Nuevo León", 
     }),
+
+   combined: (args) => {
+  if (!args.combinedCharts) return "";
+
+  const [a, b] = args.combinedCharts;
+
+  // evita loops
+  if (a.chartType === "combined" || b.chartType === "combined") return "";
+
+  const builderA = chartSvgBuilders[a.chartType];
+  const builderB = chartSvgBuilders[b.chartType];
+  if (!builderA || !builderB) return "";
+
+  const W = args.width ?? 1920;
+  const H = args.height ?? 1080;
+
+  const halfW = Math.round(W / 2);
+
+  // 👇 IMPORTANTÍSIMO: renderiza cada SVG con half width
+  const svgA = builderA({ ...a.args, width: halfW, height: H });
+  const svgB = builderB({ ...b.args, width: halfW, height: H });
+
+  const { inner: innerA } = extractInnerSvg(svgA);
+  const { inner: innerB } = extractInnerSvg(svgB);
+
+  return `
+  <?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <rect width="100%" height="100%" fill="${args.backgroundColor ?? "#000"}"/>
+
+    <g transform="translate(0,0)">
+      ${innerA}
+    </g>
+
+    <g transform="translate(${halfW},0)">
+      ${innerB}
+    </g>
+
+  </svg>
+  `.trim();
+},
+
+
 };

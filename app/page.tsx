@@ -14,6 +14,8 @@ import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
 import { getBrandTheme } from "@/lib/brand-theme";
+import type { ChartSvgArgs } from "@/lib/chart-svgs";
+
 
 export type ChartType =
   | "donut"
@@ -28,6 +30,7 @@ export type ChartType =
   | "barnarrow"
   | "stackedvertical"
   | "narrowvertbars"
+  | "combined"
   | "singletrack";
 
 export interface DatasetColumn {
@@ -269,8 +272,101 @@ export default function Home() {
 
   const [brand, setBrand] = useState<Brand | null>(null);
 
-  // ✅ Matrix: orden de filas
   const [matrixRowOrder, setMatrixRowOrder] = useState<string[]>([]);
+
+  const [combineMode, setCombineMode] = useState(false);
+  const [firstChartForCombine, setFirstChartForCombine] = useState<null | {
+  chartType: ChartType;
+  args: ChartSvgArgs;
+  title: string;
+}>(null);
+  const handleStartCombine = () => {
+  const builderArgs: ChartSvgArgs = {
+    data: dataForChart,
+    title: selectedColumn,
+    secondColumn: selectedSecondColumn,
+    columns,
+    customColors,
+    stackedColumns,
+    sheetTitle: selectedSheet,
+    width: canvasWidth,
+    height: canvasHeight,
+    inputMode,
+    labelOrder,
+    matrixRowOrder,
+    sheetValues,
+    stackedLabelCells,
+    stackedRangesSummary,
+    answerRange,
+    backgroundColor: previewBg,
+    textColor: previewTextColor,
+    secondAnswerRange,
+    brand: brand ?? "poligrama",
+    questionCell,
+  };
+
+  setFirstChartForCombine({
+    chartType,
+    args: builderArgs,
+    title: selectedColumn
+  });
+
+  setCombineMode(true);
+};
+  const handleSaveCombined = () => {
+  if (!firstChartForCombine) return;
+
+  const combinedArgs: ChartSvgArgs = {
+  data: [],
+  title: "combined",
+  width: canvasWidth,
+  height: canvasHeight,
+  backgroundColor: previewBg,
+  textColor: previewTextColor,
+  combinedCharts: [
+    firstChartForCombine,
+    {
+      chartType,
+      args: {
+        data: dataForChart,
+        title: selectedColumn,
+        secondColumn: selectedSecondColumn,
+        columns,
+        customColors,
+        stackedColumns,
+        sheetTitle: selectedSheet,
+        width: canvasWidth,
+        height: canvasHeight,
+        inputMode,
+        labelOrder,
+        matrixRowOrder,
+        sheetValues,
+        stackedLabelCells,
+        stackedRangesSummary,
+        answerRange,
+        backgroundColor: previewBg,
+        textColor: previewTextColor,
+        secondAnswerRange,
+        brand: brand ?? "poligrama",
+        questionCell,
+      },
+      title: selectedColumn,
+    },
+  ],
+};
+
+  const svg = chartSvgBuilders["combined"](combinedArgs);
+
+  addChart({
+    title: `${firstChartForCombine.title} + ${selectedColumn}`,
+    chartType: "combined",
+    svg,
+  });
+
+  setFirstChartForCombine(null);
+  setCombineMode(false);
+};
+
 
   const handleBrandSelect = (b: Brand) => {
     const theme = getBrandTheme(b);
@@ -358,7 +454,7 @@ export default function Home() {
     setAnswerRange("");
     setSecondQuestionCell("");
     setSecondAnswerRange("");
-    setMatrixRowOrder([]); // ✅ reset matrix order
+    setMatrixRowOrder([]);
 
     try {
       const spreadsheetId = parseSpreadsheetId(url);
@@ -434,7 +530,6 @@ export default function Home() {
     }
   };
 
-  /* ✅ useEffect MODIFICADO: frecuencias + matrix row order */
   useEffect(() => {
     // RAW
     if (inputMode === "raw") {
@@ -562,8 +657,6 @@ export default function Home() {
   }, [ordered, excludedLabels, adjustedFrequencies]);
 
   const labelOrder = useMemo(() => dataForChart.map((f) => f.label), [dataForChart]);
-
-  /* Add to queue */
 
   const handleAddToQueue = () => {
     if (!selectedColumn) return;
@@ -786,7 +879,7 @@ export default function Home() {
                 canvasHeight={canvasHeight}
                 inputMode={inputMode}
                 labelOrder={labelOrder}
-                matrixRowOrder={matrixRowOrder} // ✅ PASAR A PREVIEW TAMBIÉN
+                matrixRowOrder={matrixRowOrder} 
                 sheetValues={sheetValues}
                 secondAnswerRange={secondAnswerRange}
                 stackedLabelCells={stackedLabelCells}
@@ -796,6 +889,13 @@ export default function Home() {
                 previewBg={previewBg}
                 previewTextColor={previewTextColor}
                 brand={brand ?? "poligrama"}
+                isCombineMode={combineMode}
+                hasFirstChart={!!firstChartForCombine}
+                onStartCombine={handleStartCombine}
+                onSaveCombined={handleSaveCombined}
+                onCancelCombine={() => {
+                  setFirstChartForCombine(null);
+                  setCombineMode(false);}}
               />
             )}
 

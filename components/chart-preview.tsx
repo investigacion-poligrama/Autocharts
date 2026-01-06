@@ -35,6 +35,11 @@ interface ChartPreviewProps {
   brand?: Brand;
   previewTextColor: string;
   matrixRowOrder?: string[];
+  isCombineMode?: boolean;
+  hasFirstChart?: boolean;
+  onStartCombine?: () => void;
+  onSaveCombined?: () => void;
+  onCancelCombine?: () => void;
 }
 
 export default function ChartPreview({
@@ -63,6 +68,11 @@ export default function ChartPreview({
   previewTextColor,
   brand,
   matrixRowOrder,
+  isCombineMode,
+  hasFirstChart,
+  onStartCombine,
+  onSaveCombined,
+  onCancelCombine,
   
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
@@ -211,6 +221,23 @@ export default function ChartPreview({
             <Download className="mr-2 h-4 w-4" />
             Export SVG
           </Button>
+
+          {!isCombineMode && (
+  <Button variant="outline" size="sm" onClick={onStartCombine}>
+    Combinar
+  </Button>
+)}
+
+{isCombineMode && (
+  <>
+    <Button variant="outline" size="sm" onClick={onCancelCombine}>
+      Cancelar
+    </Button>
+    <Button variant="default" size="sm" onClick={onSaveCombined}>
+      Guardar combinado
+    </Button>
+  </>
+)}
         </div>
       </div>
 
