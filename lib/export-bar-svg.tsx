@@ -385,7 +385,10 @@ export function buildBarSvg({
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-  parts.push(`<g>`, ...bars, `</g>`);
+  parts.push(`<g id="chart-content">`);
+parts.push(`<g>`, ...bars, `</g>`);
+parts.push(`</g>`);
+
 
   parts.push(
     `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(

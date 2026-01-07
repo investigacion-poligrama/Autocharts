@@ -272,22 +272,26 @@ export function buildScoreSvg({
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-  // Dona de score
-  parts.push(`<g>`, ...slices, `</g>`);
+  // ✅ SOLO la gráfica va adentro de chart-content
+parts.push(`<g id="chart-content">`);
 
-  // --- 4) Overlay centrado: "Promedio" + línea + valor ---
+// Dona de score
+parts.push(`<g>`, ...slices, `</g>`);
 
-  parts.push(
-    `<text x="${cx}" y="${cy - 25}" text-anchor="middle" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="50">Promedio</text>`
-  );
+// Overlay centrado: "Promedio" + línea + valor
+parts.push(
+  `<text x="${cx}" y="${cy - 25}" text-anchor="middle" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="50">Promedio</text>`
+);
 
-  parts.push(
-    `<line x1="${cx - 130}" y1="${cy - 15}" x2="${cx + 130}" y2="${cy - 15}" stroke="${mainTextColor}" stroke-width="2"/>`
-  );
+parts.push(
+  `<line x1="${cx - 130}" y1="${cy - 15}" x2="${cx + 130}" y2="${cy - 15}" stroke="${mainTextColor}" stroke-width="2"/>`
+);
 
-  parts.push(
-    `<text x="${cx}" y="${cy + 60}" text-anchor="middle" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="75" font-weight="700">${avgDisp}</text>`
-  );
+parts.push(
+  `<text x="${cx}" y="${cy + 60}" text-anchor="middle" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="75" font-weight="700">${avgDisp}</text>`
+);
+
+parts.push(`</g>`);
 
   // Footer
   parts.push(

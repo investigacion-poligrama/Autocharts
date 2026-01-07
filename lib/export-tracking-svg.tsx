@@ -487,6 +487,8 @@ if (!categories.length) {
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
+  parts.push(`<g id="chart-content">`);
+
   /* -------------------- LEYENDA (pills) -------------------- */
 
   const legendX = marginLeft;
@@ -691,12 +693,15 @@ if (!categories.length) {
     });
   });
 
+  parts.push(`</g>`);
+
   // Footer
   parts.push(
     `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
       ChartConfig.footer
     )}</text>`
   );
+
 
   parts.push(`</svg>`);
 

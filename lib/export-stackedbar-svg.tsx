@@ -400,9 +400,14 @@ export function buildStackedBarSvg({
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
-  // leyenda + barras
-  parts.push(`<g>`, ...legendParts, `</g>`);
-  parts.push(`<g>`, ...bars, `</g>`);
+// ✅ SOLO chart-content para combined
+parts.push(`<g id="chart-content">`);
+
+parts.push(`<g>`, ...legendParts, `</g>`);
+parts.push(`<g>`, ...bars, `</g>`);
+
+parts.push(`</g>`);
+
 
   // footer
   parts.push(

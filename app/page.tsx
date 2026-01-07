@@ -323,6 +323,7 @@ export default function Home() {
   height: canvasHeight,
   backgroundColor: previewBg,
   textColor: previewTextColor,
+  sheetTitle: selectedSheet,
   combinedCharts: [
     firstChartForCombine,
     {

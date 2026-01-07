@@ -297,11 +297,16 @@ export function buildDonutSvg({
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
 
+  parts.push(`<g id="chart-content">`);
+
   // Donut
   parts.push(`<g>`, ...slices, `</g>`);
 
   // Leyenda
   parts.push(...legendItems);
+
+  parts.push(`</g>`);
+
 
   // Footer
   parts.push(

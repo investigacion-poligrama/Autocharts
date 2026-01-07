@@ -13,6 +13,7 @@ import type { Brand } from "@/types/brand";
 import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
 import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
 import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
+import { ChartConfig} from "./chartconfig";
 
 
 export interface ChartSvgArgs {
@@ -65,24 +66,49 @@ function parsePercent(raw: unknown): number {
 }
 
 function extractInnerSvg(svg: string) {
-  let inner = svg
-    .replace(/^[\s\S]*?<svg[^>]*>/i, "")
-    .replace(/<\/svg>\s*$/i, "");
+  const start = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
+  if (start === -1) {
+    // fallback: quita wrapper <svg>
+    return svg
+      .replace(/^[\s\S]*?<svg[^>]*>/i, "")
+      .replace(/<\/svg>\s*$/i, "")
+      .replace(/<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i, "");
+  }
 
-  // quita rect background completo
-  inner = inner.replace(
-    /<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i,
-    ""
-  );
+  // encuentra apertura exacta del <g ...>
+  const openTagMatch = svg.slice(start).match(/<g[^>]*id="chart-content"[^>]*>/i);
+  if (!openTagMatch) return "";
 
-  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/i);
-  const viewBox = viewBoxMatch ? viewBoxMatch[1] : null;
+  const openTag = openTagMatch[0];
+  const contentStart = start + openTag.length;
 
-  return { inner, viewBox };
+  // ahora hay que encontrar el cierre correcto del </g>
+  let depth = 1;
+  let i = contentStart;
+
+  const re = /<\/?g\b[^>]*>/gi;
+  re.lastIndex = contentStart;
+
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(svg))) {
+    const tag = match[0];
+    if (tag.startsWith("</")) depth--;
+    else depth++;
+
+    if (depth === 0) {
+      const contentEnd = match.index;
+      return svg.slice(contentStart, contentEnd);
+    }
+  }
+
+  return "";
 }
 
-
-
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 /* ------------------------------------------------------------------ */
 /* stacked: modo RAW (base de datos) – tu lógica original             */
@@ -490,34 +516,115 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       headerLeftLabel: "Monterrey, Nuevo León", 
     }),
 
-   combined: (args) => {
+  combined: (args) => {
   if (!args.combinedCharts) return "";
 
   const [a, b] = args.combinedCharts;
-
-  // evita loops
   if (a.chartType === "combined" || b.chartType === "combined") return "";
-
-  const builderA = chartSvgBuilders[a.chartType];
-  const builderB = chartSvgBuilders[b.chartType];
-  if (!builderA || !builderB) return "";
 
   const W = args.width ?? 1920;
   const H = args.height ?? 1080;
-
   const halfW = Math.round(W / 2);
 
-  // 👇 IMPORTANTÍSIMO: renderiza cada SVG con half width
-  const svgA = builderA({ ...a.args, width: halfW, height: H });
-  const svgB = builderB({ ...b.args, width: halfW, height: H });
+  const bg = args.backgroundColor ?? "#000";
+  const mainTextColor = args.textColor ?? "#fff";
+  const mutedTextColor = args.textColor ? args.textColor : "#bdbdbd";
 
-  const { inner: innerA } = extractInnerSvg(svgA);
-  const { inner: innerB } = extractInnerSvg(svgB);
+  const sheetTitle = args.sheetTitle ?? "";
+  const titleFs = ChartConfig.typography.title.fontSize;
+
+  // ✅ usa EXACTO chartconfig
+  const marginLeft = 120;
+  const marginRight = 120;
+  const marginTop = 125;
+  const marginBottom = 125;
+
+  // ✅ tamaños estándar
+  const headerFs = 40; // Poligrama / Poder / Ganar
+  const headerLine = headerFs * 1.1;
+
+  // ✅ Sheet title en el lugar donde antes estaba Resultados
+  const sheetTitleY = marginTop - 24; // = logoY0
+
+  // ✅ pregunta se queda como antes (pero baja si hay sheetTitle)
+  const questionFs = ChartConfig.typography.title.fontSize; 
+  const questionY = sheetTitle
+    ? sheetTitleY + headerLine * 2.4
+    : marginTop + headerLine * 2.4;
+
+  const lineY = questionY + 55;
+
+  // ✅ Render each chart half
+  const svgA = chartSvgBuilders[a.chartType]({ ...a.args, width: halfW, height: H });
+  const svgB = chartSvgBuilders[b.chartType]({ ...b.args, width: halfW, height: H });
+
+  const innerA = extractInnerSvg(svgA);
+  const innerB = extractInnerSvg(svgB);
+
+  const question = a.args.title ?? "";
+
+  const logoX = W - marginRight;
+  const logoY0 = sheetTitleY;
 
   return `
   <?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <rect width="100%" height="100%" fill="${args.backgroundColor ?? "#000"}"/>
+    <rect width="100%" height="100%" fill="${bg}"/>
+
+    <!-- Sheet title (dinámico) -->
+    ${sheetTitle ? `
+    <text x="${marginLeft}" y="${sheetTitleY}"
+      fill="${mainTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${titleFs}"
+      font-weight="400">
+      ${esc(sheetTitle)}
+    </text>` : ""}
+
+    <!-- Pregunta -->
+    <text x="${marginLeft}" y="${questionY}"
+      fill="${mainTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${questionFs}"
+      font-weight="400">
+      ${esc(question)}
+    </text>
+
+    <!-- Línea -->
+    <line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}"
+      y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>
+
+    <!-- Header Poligrama -->
+    <text x="${logoX}" y="${logoY0}"
+      fill="${mainTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${headerFs}"
+      font-weight="700"
+      text-anchor="end">Poligrama.</text>
+
+    <text x="${logoX}" y="${logoY0 + headerLine}"
+      fill="${mainTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${headerFs}"
+      font-weight="700"
+      text-anchor="end">Poder.</text>
+
+    <text x="${logoX}" y="${logoY0 + headerLine * 2}"
+      fill="${mainTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${headerFs}"
+      font-weight="700"
+      text-anchor="end">Ganar.</text>
+
+    <!-- Footer -->
+    <text x="${W - marginRight}" y="${H - marginBottom}"
+      fill="${mutedTextColor}"
+      font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
+      font-size="${ChartConfig.typography.footer.fontSize}"
+      font-weight="500"
+      text-anchor="end">
+      ${esc(ChartConfig.footer)}
+    </text>
 
     <g transform="translate(0,0)">
       ${innerA}
@@ -530,6 +637,9 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
   </svg>
   `.trim();
 },
+
+
+
 
 
 };

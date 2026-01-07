@@ -247,6 +247,7 @@ export function buildPartidoSvg({
       logoY0 + headerLine * 2
     }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
   );
+  parts.push(`<g id="chart-content">`);
 
   /* -------------------- FILAS PARTIDO -------------------- */
 
@@ -325,6 +326,7 @@ export function buildPartidoSvg({
        </text>`
     );
   });
+parts.push(`</g>`);
 
   // Footer
   parts.push(

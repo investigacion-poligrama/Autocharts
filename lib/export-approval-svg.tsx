@@ -280,7 +280,7 @@ export function buildApprovalSvg({
   );
 
   /* -------------------- BARRAS -------------------- */
-
+  parts.push(`<g id="chart-content">`);
   items.forEach((item, idx) => {
     const pct = item.percentage ?? 0;
     const barHeight = (Math.max(0, Math.min(100, pct)) / 100) * barBaseHeight;
@@ -334,6 +334,9 @@ export function buildApprovalSvg({
         `</text>`
     );
   });
+
+  parts.push(`</g>`);
+
 
   // Footer
   parts.push(

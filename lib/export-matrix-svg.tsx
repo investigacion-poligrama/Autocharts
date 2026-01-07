@@ -270,6 +270,7 @@ const finalRowOrder =
       font-family="${FONT_STACK}">Ganar.</text>`
   );
 
+parts.push(`<g id="chart-content">`);
   const tableTop = lineY + 60;
   const tableBottom = H - marginBottom - 40;
   const tableHeight = tableBottom - tableTop;
@@ -350,6 +351,7 @@ const finalRowOrder =
       );
     });
   });
+parts.push(`</g>`);
 
   parts.push(
     `<text x="${W - marginRight}" y="${H - marginBottom}"
