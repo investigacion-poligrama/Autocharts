@@ -72,6 +72,32 @@ function a1ToRowColSummary(a1: string) {
   return { row, col }; // 1-based
 }
 
+function catmullRomToBezier(points: { x: number; y: number }[]) {
+  if (points.length < 2) return "";
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    // factor de suavidad (0.15–0.3 es buen rango)
+    const smoothing = 0.15;
+
+    const cp1x = p1.x + (p2.x - p0.x) * smoothing;
+    const cp1y = p1.y + (p2.y - p0.y) * smoothing;
+
+    const cp2x = p2.x - (p3.x - p1.x) * smoothing;
+    const cp2y = p2.y - (p3.y - p1.y) * smoothing;
+
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+
+  return d;
+}
+
 function parseA1RangeSummary(range: string) {
   const [startStr, endStr] = range.split(":");
   const start = a1ToRowColSummary(startStr);
@@ -296,6 +322,47 @@ function colorForProblem(
 /* ------------------------------------------------------------------ */
 /*   Builder principal SVG                                            */
 /* ------------------------------------------------------------------ */
+function monthToAbbr(raw: string): string {
+  const s = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quita acentos
+    .trim();
+
+  const map: Record<string, string> = {
+    enero: "ENE",
+    feb: "FEB",
+    febrero: "FEB",
+    mar: "MAR",
+    marzo: "MAR",
+    abr: "ABR",
+    abril: "ABR",
+    may: "MAY",
+    mayo: "MAY",
+    jun: "JUN",
+    junio: "JUN",
+    jul: "JUL",
+    julio: "JUL",
+    ago: "AGO",
+    agosto: "AGO",
+    sep: "SEP",
+    septiembre: "SEP",
+    setiembre: "SEP",
+    oct: "OCT",
+    octubre: "OCT",
+    nov: "NOV",
+    noviembre: "NOV",
+    dic: "DIC",
+    diciembre: "DIC",
+  };
+
+  // si ya viene como "FEB", "Mar", etc
+  const first3 = s.slice(0, 3).toUpperCase();
+  const alreadyAbbr = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+  if (alreadyAbbr.includes(first3)) return first3;
+
+  return map[s] ?? first3;
+}
 
 export function buildTrackingSvg({
   data = [],
@@ -383,6 +450,7 @@ export function buildTrackingSvg({
   }
 
   let { months, categories } = trackingData;
+  months = months.map(monthToAbbr);
 if (!months.length || !categories.length) {
   return basicTrackingMessageSvg("No hay datos suficientes para tracking");
 }
@@ -564,42 +632,88 @@ if (!categories.length) {
     );
   });
 
-  /* -------------------- GRID + Y labels -------------------- */
-
-  const gridLines = 10;
-  for (let i = 0; i <= gridLines; i++) {
-    const t = i / gridLines;
-    const y = chartY0 + chartHeight * t;
-    const value = yMax * (1 - t);
-
-    parts.push(
-      `<line x1="${chartX0}" y1="${y}" x2="${
-        chartX0 + chartWidth
-      }" y2="${y}" stroke="${ChartConfig.colors.neutral}" stroke-width="0.5" opacity="0.3" />`,
-      `<text x="${
-        chartX0 - 10
-      }" y="${y + 4}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="20" text-anchor="end">${Math.round(
-        value
-      )}</text>`
-    );
-  }
-
   /* -------------------- Meses (X labels) -------------------- */
 
-  months.forEach((month, i) => {
-    const x =
-      monthsCount > 1
-        ? chartX0 + innerMarginX + i * xStep
-        : chartX0 + chartWidth / 2;
+  // --- calcular punto más alto en cada mes para cortar la línea vertical ---
+const cutYByMonth: number[] = Array(monthsCount).fill(chartY0 + chartHeight);
 
+// ----------- GRID vertical por mes con huecos en los puntos (como foto 1) -----------
+
+months.forEach((month, i) => {
+  const GRID_STROKE = "#D9D9D9";   
+const GRID_WIDTH = 0.25;     
+const GRID_OPACITY = 1;      
+
+  const x =
+    monthsCount > 1
+      ? chartX0 + innerMarginX + i * xStep
+      : chartX0 + chartWidth / 2;
+
+  // obtén todos los y de puntos en ese mes
+  const yPoints = categories
+    .map((cat) => cat.values[i])
+    .filter((v) => v > 0)
+    .map((value) => chartY0 + chartHeight - (value / yMax) * chartHeight)
+    .sort((a, b) => a - b); // orden ascendente (top->bottom)
+
+  const holeRadius = 10; // hueco alrededor del punto (ajústalo)
+
+  // si no hay puntos -> línea completa
+  if (!yPoints.length) {
     parts.push(
-      `<text x="${x}" y="${
-        chartY0 + chartHeight + 24
-      }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">${esc(
-        month
-      )}</text>`
+      `<line x1="${x}" y1="${chartY0}" x2="${x}" y2="${chartY0 + chartHeight}"
+        stroke="${GRID_STROKE}"
+        stroke-width="${GRID_WIDTH}"
+        opacity="${GRID_OPACITY}
+        shape-rendering="crispEdges"
+        stroke-linecap="square""
+        />`
     );
+    return;
+  }
+
+  // segmento desde arriba hasta antes del primer punto
+  let lastY = chartY0;
+  yPoints.forEach((y) => {
+    const yStart = lastY;
+    const yEnd = y - holeRadius;
+
+    if (yEnd > yStart) {
+      parts.push(
+        `<line x1="${x}" y1="${yStart}" x2="${x}" y2="${yEnd}"
+          stroke="${ChartConfig.colors.neutral}"
+          stroke-width="1"
+          opacity="0.10" />`
+      );
+    }
+
+    // saltar el hueco del punto
+    lastY = y + holeRadius;
   });
+
+  // segmento final desde después del último punto hasta abajo
+  if (lastY < chartY0 + chartHeight) {
+    parts.push(
+      `<line x1="${x}" y1="${lastY}" x2="${x}" y2="${chartY0 + chartHeight}"
+        stroke="${ChartConfig.colors.neutral}"
+        stroke-width="1"
+        opacity="0.10" />`
+    );
+  }
+});
+
+categories.forEach((cat) => {
+  cat.values.forEach((value, i) => {
+    const y =
+      chartY0 +
+      chartHeight -
+      (value / yMax) * chartHeight;
+
+    // queremos el más alto (menor y)
+    cutYByMonth[i] = Math.min(cutYByMonth[i], y);
+  });
+});
+
 
   /* -------------------- Líneas y puntos -------------------- */
   function darken(hex: string, amount: number = 0.3): string {
@@ -642,17 +756,17 @@ if (!categories.length) {
 
       points.push({ x, y, v: value, monthIdx: i });
     });
+    
 
     // path de la línea
     if (points.length > 1) {
-      let d = `M ${points[0].x} ${points[0].y}`;
-      for (let i = 1; i < points.length; i++) {
-        d += ` L ${points[i].x} ${points[i].y}`;
-      }
-      parts.push(
-        `<path d="${d}" stroke="${color}" stroke-width="6" fill="none" />`
-      );
-    }
+  const d = catmullRomToBezier(points);
+  parts.push(
+    `<path d="${d}" stroke="${color}" stroke-width="2" fill="none"
+      stroke-linecap="round" stroke-linejoin="round" />`
+  );
+}
+
 
     // puntos + etiquetas con anti-overlap
     points.forEach((pt) => {
@@ -677,7 +791,7 @@ if (!categories.length) {
 
       // punto
       parts.push(
-        `<circle cx="${pt.x}" cy="${pt.y}" r="4" fill="${color}" stroke="#ffffff" stroke-width="2" />`
+        `<circle cx="${pt.x}" cy="${pt.y}" r="8" fill="${color}" />`
       );
 
       // número
@@ -685,7 +799,7 @@ if (!categories.length) {
         `<text x="${pt.x}" y="${finalY}"
           fill="${textColorPoint}"
           font-family="Helvetica, Arial, sans-serif"
-          font-size="25" font-weight="700"
+          font-size="18" font-weight="700"
           text-anchor="middle">
           ${pt.v}%
         </text>`
