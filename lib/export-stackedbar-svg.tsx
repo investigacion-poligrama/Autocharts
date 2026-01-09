@@ -341,8 +341,8 @@ export function buildStackedBarSvg({
         const textY = centerY + 3;
 
         bars.push(
-          `<text x="${textX}" y="${textY}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="middle" dominant-baseline="middle">${value}%</text>`
-        );
+  `<text x="${textX}" y="${textY}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="middle" dominant-baseline="middle">${Number(value).toFixed(1)}%</text>`
+);
       }
 
       currentX += widthPx;

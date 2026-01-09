@@ -235,8 +235,7 @@ export function buildDonutSvg({
         legendTop + i * (pillHeight + 20)
       })">` +
         `<rect x="${-pillWidth / 2}" y="0" width="${pillWidth}" height="${pillHeight}" rx="12" ry="12" fill="${color}"/>` +
-        // 👇 estos los dejo en blanco para contraste sobre la pastilla
-        `<text x="0" y="24" text-anchor="middle" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${fsPercent}" font-weight="700">${item.percentage}%</text>` +
+        `<text x="0" y="24" text-anchor="middle" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="${fsPercent}" font-weight="700">${Number(item.percentage).toFixed(1)}%</text>` +
         `<text x="0" y="44" text-anchor="middle" fill="#ffffff" font-weight="700" font-family="Helvetica, Arial, sans-serif" font-size="${fsLabel}">${esc(
           item.label
         )}</text>` +

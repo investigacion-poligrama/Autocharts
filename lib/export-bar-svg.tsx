@@ -172,17 +172,27 @@ export function buildBarSvg({
   } = prepareTitle(title, baseTitleFs, maxTitleChars);
 
   const lineY = titleY + titleBlockH + 16;
-
+  
   const barAreaTop = lineY + 60;
   const barAreaBottom = H - marginBottom - 40;
   const barAreaHeight = barAreaBottom - barAreaTop;
 
-  const x0 = marginLeftLabels;
-  const x1 = W - marginRight;
   const percZoneWidth = 100;
-  const barMaxWidth = x1 - x0 - percZoneWidth;
+const rows = data.length || 1;
 
-  const rows = data.length || 1;
+const fullX0 = marginLeftLabels;
+const fullX1 = W - marginRight;
+const fullWidth = fullX1 - fullX0;
+
+// ↓ Ajusta este factor (0.65–0.85) como quieras
+const widthFactor = rows >= 9 ? 1 : 0.72;
+
+const colWidth = fullWidth * widthFactor;
+
+// ↓ Esto centra el bloque horizontal
+const centeredX0 = fullX0 + (fullWidth - colWidth) / 2;
+const centeredX1 = centeredX0 + colWidth;
+
 
   const normalized = data.map((d) => {
     const raw =
@@ -214,10 +224,10 @@ export function buildBarSvg({
   const numCols = rows > 8 ? 2 : 1;
 
   if (numCols === 1) {
-    const x0 = marginLeftLabels;
-    const x1 = W - marginRight;
-    const colWidth = x1 - x0;
-    const barMaxWidth = colWidth - percZoneWidth;
+  const x0 = centeredX0;
+  const x1 = centeredX1;
+  const colWidth = x1 - x0;
+  const barMaxWidth = colWidth - percZoneWidth;
 
     const gap = barAreaHeight / (rows * 2);
     const barHeight = gap;
@@ -314,9 +324,10 @@ export function buildBarSvg({
       </text>`
     );
 
-    const percText = `${item.value}%`;
+    const percText = `${Number(item.value).toFixed(1)}%`;
     const percPaddingRight = 10;
-    const percX = x1 - percPaddingRight;
+    const percX = x0 + barMaxWidth + percZoneWidth - percPaddingRight;
+
 
     bars.push(
       `<text

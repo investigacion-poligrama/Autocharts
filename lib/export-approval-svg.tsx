@@ -309,10 +309,11 @@ export function buildApprovalSvg({
     // porcentaje encima
     const textPctY = yTopBg - 16;
     parts.push(
-      `<text x="${
-        x + barWidth / 2
-      }" y="${textPctY}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle">${pct}%</text>`
-    );
+  `<text x="${
+    x + barWidth / 2
+  }" y="${textPctY}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle">${pct.toFixed(1)}%</text>`
+);
+
 
     // label debajo
     const labelLines = wrapLabel(item.label, 18);

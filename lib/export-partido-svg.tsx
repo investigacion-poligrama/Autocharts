@@ -318,13 +318,13 @@ export function buildPartidoSvg({
     const pctY = centerY + 2;
 
     parts.push(
-      `<text x="${pctX}" y="${pctY}" fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="24" font-weight="700"
-             text-anchor="middle" dominant-baseline="middle">
-        ${pct}%
-       </text>`
-    );
+  `<text x="${pctX}" y="${pctY}" fill="${mainTextColor}"
+         font-family="Helvetica, Arial, sans-serif"
+         font-size="24" font-weight="700"
+         text-anchor="middle" dominant-baseline="middle">
+    ${Number(pct).toFixed(1)}%
+   </text>`
+);
   });
 parts.push(`</g>`);
 
