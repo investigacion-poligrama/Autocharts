@@ -378,28 +378,6 @@ export function buildStackedBarSvg({
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
-  if (sheetTitle) {
-    parts.push(
-      `<text x="${marginLeft}" y="${logoY0}"
-             fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
-        ${esc(sheetTitle)}
-       </text>`
-    );
-  }
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
-  );
-
 // ✅ SOLO chart-content para combined
 parts.push(`<g id="chart-content">`);
 
@@ -407,14 +385,6 @@ parts.push(`<g>`, ...legendParts, `</g>`);
 parts.push(`<g>`, ...bars, `</g>`);
 
 parts.push(`</g>`);
-
-
-  // footer
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
-      ChartConfig.footer
-    )}</text>`
-  );
 
   parts.push(`</svg>`);
 
