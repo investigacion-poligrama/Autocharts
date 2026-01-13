@@ -246,30 +246,6 @@ const finalRowOrder =
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
-  if (sheetTitle) {
-    let sheetTitleY = logoY0 + 40;
-    if (isTall) sheetTitleY = logoY0 + 60;
-
-    parts.push(
-      `<text x="${marginLeft}" y="${sheetTitleY}" fill="${mainTextColor}"
-        font-family="${FONT_STACK}" font-size="30" text-anchor="start">
-        ${esc(sheetTitle)}
-      </text>`
-    );
-  }
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end"
-      font-family="${FONT_STACK}">Poligrama.</text>`,
-    `<text x="${logoX}" y="${logoY0 + headerLine}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end"
-      font-family="${FONT_STACK}">Poder.</text>`,
-    `<text x="${logoX}" y="${logoY0 + headerLine * 2}" fill="${mainTextColor}"
-      font-size="${headerFs}" font-weight="700" text-anchor="end"
-      font-family="${FONT_STACK}">Ganar.</text>`
-  );
-
 parts.push(`<g id="chart-content">`);
   const tableTop = lineY + 60;
   const tableBottom = H - marginBottom - 40;
@@ -352,14 +328,6 @@ parts.push(`<g id="chart-content">`);
     });
   });
 parts.push(`</g>`);
-
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}"
-      fill="${mutedTextColor}" font-size="${footerFs}" text-anchor="end"
-      font-family="${FONT_STACK}">
-      ${esc(ChartConfig.footer)}
-    </text>`
-  );
 
   parts.push(`</svg>`);
   return parts.join("\n");

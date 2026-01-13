@@ -13,21 +13,25 @@ type WrappedTitle = {
   blockHeight: number;
 };
 
-function darkerTransparent(base: string): string {
+function darkerTransparent(base: string): { fill: string; opacity: number } {
   const hex = base.replace("#", "");
-  if (hex.length !== 6) return base;
+  if (hex.length !== 6) return { fill: base, opacity: 0.9 };
 
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
 
   const factor = 0.8;
-  const rd = Math.round(r * factor);
-  const gd = Math.round(g * factor);
-  const bd = Math.round(b * factor);
+  const rd = Math.max(0, Math.min(255, Math.round(r * factor)));
+  const gd = Math.max(0, Math.min(255, Math.round(g * factor)));
+  const bd = Math.max(0, Math.min(255, Math.round(b * factor)));
 
-  return `rgba(${rd}, ${gd}, ${bd}, 0.9)`;
+  const toHex = (v: number) => v.toString(16).padStart(2, "0");
+  const fill = `#${toHex(rd)}${toHex(gd)}${toHex(bd)}`;
+
+  return { fill, opacity: 0.9 };
 }
+
 
 function wrapPartidoLabel(text: string, maxChars = 14): string[] {
   const words = text.split(/\s+/);
@@ -225,28 +229,6 @@ export function buildPartidoSvg({
   // Poligrama / Poder. / Ganar.
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
-
-  if (sheetTitle) {
-    parts.push(
-      `<text x="${marginLeft}" y="${logoY0}"
-             fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
-        ${esc(sheetTitle)}
-       </text>`
-    );
-  }
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
-  );
   parts.push(`<g id="chart-content">`);
 
   /* -------------------- FILAS PARTIDO -------------------- */
@@ -307,12 +289,13 @@ export function buildPartidoSvg({
     const pctPillX = pillX + pillWidth - pctPillWidth - 12;
     const pctPillY = centerY - pctPillHeight / 2;
 
-    const pctPillColor = darkerTransparent(barColor);
+    const pctPill = darkerTransparent(barColor);
 
-    parts.push(
-      `<rect x="${pctPillX}" y="${pctPillY}" width="${pctPillWidth}" height="${pctPillHeight}"
-             rx="${pctPillHeight / 2}" ry="${pctPillHeight / 2}" fill="${pctPillColor}" />`
-    );
+parts.push(
+  `<rect x="${pctPillX}" y="${pctPillY}" width="${pctPillWidth}" height="${pctPillHeight}"
+         rx="${pctPillHeight / 2}" ry="${pctPillHeight / 2}"
+         fill="${pctPill.fill}" fill-opacity="${pctPill.opacity}" />`
+);
 
     const pctX = pctPillX + pctPillWidth / 2;
     const pctY = centerY + 2;
@@ -327,13 +310,6 @@ export function buildPartidoSvg({
 );
   });
 parts.push(`</g>`);
-
-  // Footer
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
-      ChartConfig.footer
-    )}</text>`
-  );
 
   parts.push(`</svg>`);
 
