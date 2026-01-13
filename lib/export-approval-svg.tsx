@@ -106,22 +106,17 @@ function mainColorFor(
 }
 
 // color de fondo de la barra (columna completa)
-function bgColorFor(
-  label: string,
-  customColors: Record<string, string>
-): string {
+function bgColorFor(label: string, customColors: Record<string, string>): { fill: string; opacity?: number } {
   const custom = mainColorFor(label, customColors);
 
   const norm = normalizeLabel(label);
-  if (APPROVAL_BG_COLORS[norm]) return APPROVAL_BG_COLORS[norm];
+  if (APPROVAL_BG_COLORS[norm]) return { fill: APPROVAL_BG_COLORS[norm] }; // ya viene en hex
 
   const hex = custom.replace("#", "");
-  if (hex.length !== 6) return custom;
+  if (hex.length !== 6) return { fill: custom };
 
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, 0.25)`;
+  // mismo color, pero con opacidad separada (compatible con Illustrator)
+  return { fill: `#${hex}`, opacity: 0.25 };
 }
 
 // extendemos el tipo para aceptar width/height opcionales
@@ -250,35 +245,7 @@ export function buildApprovalSvg({
     }" y2="${lineY}" stroke="${mainTextColor}" stroke-width="2" />`
   );
 
-  // Poligrama / Poder. / Ganar. + hoja
-  const logoX = W - marginRight;
-  const logoY0 = marginTop - 24;
-
-  if (sheetTitle) {
-    let sheetTitleY = logoY0 + 40;
-    if (isTall1440) sheetTitleY = logoY0 + 60;
-
-    parts.push(
-      `<text x="${marginLeft}" y="${sheetTitleY}"
-             fill="${mainTextColor}"
-             font-family="Helvetica, Arial, sans-serif"
-             font-size="30"
-             text-anchor="start">
-        ${esc(sheetTitle)}
-       </text>`
-    );
-  }
-
-  parts.push(
-    `<text x="${logoX}" y="${logoY0}" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poligrama.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Poder.</text>`,
-    `<text x="${logoX}" y="${
-      logoY0 + headerLine * 2
-    }" fill="${mainTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${headerFs}" font-weight="700" text-anchor="end">Ganar.</text>`
-  );
-
+  
   /* -------------------- BARRAS -------------------- */
   parts.push(`<g id="chart-content">`);
   items.forEach((item, idx) => {
@@ -294,12 +261,13 @@ export function buildApprovalSvg({
     const yTopBg = yBase - barBaseHeight;
 
     const mainColor = mainColorFor(item.label, customColors);
-    const bgColor = bgColorFor(item.label, customColors);
+    const bg = bgColorFor(item.label, customColors);
 
-    // columna de fondo
-    parts.push(
-      `<rect x="${x}" y="${yTopBg}" width="${barWidth}" height="${barBaseHeight}" rx="8" ry="8" fill="${bgColor}" />`
-    );
+parts.push(
+  `<rect x="${x}" y="${yTopBg}" width="${barWidth}" height="${barBaseHeight}"
+         rx="8" ry="8"
+         fill="${bg.fill}"${bg.opacity != null ? ` fill-opacity="${bg.opacity}"` : ""} />`
+);
 
     // parte llena
     parts.push(
@@ -337,15 +305,6 @@ export function buildApprovalSvg({
   });
 
   parts.push(`</g>`);
-
-
-  // Footer
-  parts.push(
-    `<text x="${W - marginRight}" y="${H - marginBottom}" fill="${mutedTextColor}" font-family="Helvetica, Arial, sans-serif" font-size="${footerFs}" text-anchor="end">${esc(
-  ChartConfig.footer
-)}</text>`
-  );
-
   parts.push(`</svg>`);
 
   return parts.join("\n");
