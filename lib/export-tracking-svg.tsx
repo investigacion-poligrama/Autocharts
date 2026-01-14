@@ -228,6 +228,8 @@ export function buildTrackingSvg({
   answerRange,
   backgroundColor,
   textColor,
+  isCombinedMode,
+  hideLegend,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
@@ -279,8 +281,13 @@ export function buildTrackingSvg({
   const contentBottom = H - marginBottom - 120;
   const contentHeight = contentBottom - contentTop;
 
-  const legendWidth = 420;
-  const chartX0 = marginLeft + legendWidth + 120;
+  const shouldHideLegend = !!hideLegend || !!isCombinedMode;
+
+// si NO hay leyenda, no reserves ese ancho
+const legendWidth = shouldHideLegend ? 0 : 420;
+
+// si no hay leyenda, el chart arranca pegado a marginLeft
+const chartX0 = marginLeft + (shouldHideLegend ? 0 : legendWidth + 120);
   const chartY0 = contentTop;
   const chartWidth = W - chartX0 - marginRight;
   const chartHeight = contentHeight;
@@ -318,9 +325,8 @@ export function buildTrackingSvg({
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
-
     /* -------------------- LEYENDA (pills) -------------------- */
-
+if (!shouldHideLegend) {  
   const legendX = marginLeft;
   const pillCols = 2;
   const pillGapX = 16;
@@ -396,6 +402,7 @@ export function buildTrackingSvg({
         `</text>`
     );
   });
+}
 
   parts.push(`<g id="chart-content">`);
 
