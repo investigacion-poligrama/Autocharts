@@ -239,7 +239,6 @@ export function buildTrackingSvg({
   const mutedTextColor = textColor ?? "#bdbdbd";
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
-  const footerFs = ChartConfig.typography.footer.fontSize;
   const headerFs = 40;
   const headerLine = headerFs * 1.1;
 
@@ -503,9 +502,6 @@ if (!shouldHideLegend) {
     });
   });
 
-  parts.push(`</g>`);
-
-  // ✅ Labels eje X (meses)
   const MONTH_LABEL_Y_OFFSET = 55;
 
   months.forEach((month, i) => {
@@ -525,7 +521,7 @@ if (!shouldHideLegend) {
       </text>`
     );
   });
-
+  parts.push(`</g>`);
   parts.push(`</svg>`);
   return parts.join("\n");
 }
