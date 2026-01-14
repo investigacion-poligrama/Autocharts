@@ -602,15 +602,6 @@ if (hasTracking) {
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="${bg}"/>
 
-  ${sheetTitle ? `
-  <text x="${marginLeft}" y="${sheetTitleY}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${titleFs}"
-    font-weight="400">
-    ${esc(sheetTitle)}
-  </text>` : ""}
-
   <text x="${marginLeft}" y="${questionY}"
     fill="${mainTextColor}"
     font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
@@ -622,35 +613,6 @@ if (hasTracking) {
   <line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}"
     y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>
 
-  <text x="${logoX}" y="${logoY0}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Poligrama.</text>
-
-  <text x="${logoX}" y="${logoY0 + headerLine}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Poder.</text>
-
-  <text x="${logoX}" y="${logoY0 + headerLine * 2}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Ganar.</text>
-
-  <text x="${W - marginRight}" y="${H - marginBottom}"
-    fill="${mutedTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${ChartConfig.typography.footer.fontSize}"
-    font-weight="500"
-    text-anchor="end">
-    ${esc(ChartConfig.footer)}
-  </text>
 
   <!-- Izquierda: otro chart (1/4) -->
   <g transform="translate(0,0)">
