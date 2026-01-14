@@ -227,7 +227,7 @@ export function buildDonutSvg({
     const color =
       customColors[item.label] ?? PALETTE[i % PALETTE.length];
 
-    const pillWidth = isTall1440 ? colWidth * 3.2 : colWidth * 3;
+    const pillWidth = isTall1440 ? colWidth * 1.8 : colWidth * 1.8;
     const pillHeight = 60;
 
     legendItems.push(

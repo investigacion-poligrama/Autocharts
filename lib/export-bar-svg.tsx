@@ -307,7 +307,7 @@ const centeredX1 = centeredX0 + colWidth;
         .replace(/\s*\n\s*/g, " ")
     );
 
-    const labelFont = 22;
+    const labelFont = 27;
     const topLabelY = top - 12;
 
     bars.push(
@@ -335,7 +335,7 @@ const centeredX1 = centeredX0 + colWidth;
         y="${centerY}"
         fill="${mainTextColor}"
         font-family="Helvetica, Arial, sans-serif"
-        font-size="25"
+        font-size="28"
         font-weight="700"
         text-anchor="end"
         dominant-baseline="middle"
