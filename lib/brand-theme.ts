@@ -24,10 +24,10 @@ export function getBrandTheme(brand: Brand): BrandTheme {
   // 🔹 DESKOVER (placeholder por ahora)
   if (brand === "deskover") {
     return {
-      fontFamily: "Geist, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily:  "Futura Condensed ExtraBold, Futura, Arial, sans-serif",
       footer: "",
-      defaultBackground: "#ffffff",
-      defaultTextColor: "#000000",
+      defaultBackground: "#232323",
+      defaultTextColor: "#ffffff",
     };
   }
 
@@ -35,7 +35,6 @@ export function getBrandTheme(brand: Brand): BrandTheme {
   return {
     fontFamily:
       ChartConfig.typography.fontFamily ?? "Helvetica, Arial, sans-serif",
-    headerLines: ["Poligrama.", "Poder.", "Ganar."],
     footer: ChartConfig.footer,
     defaultBackground: "#000000",
     defaultTextColor: "#ffffff",

@@ -107,8 +107,8 @@ export default function ChartPreview({
       answerRange,
       questionCell,
       matrixRowOrder,
-      backgroundColor: previewBg,
-      textColor: previewTextColor,
+      backgroundColor: previewBg?.trim() ? previewBg : undefined,
+      textColor: previewTextColor?.trim() ? previewTextColor : undefined,
       brand: brand ?? "poligrama",
     });
 
@@ -163,8 +163,8 @@ export default function ChartPreview({
         stackedRangesSummary,
         answerRange,
         questionCell,
-        backgroundColor: previewBg,
-        textColor: previewTextColor,
+        backgroundColor: previewBg?.trim() ? previewBg : undefined,
+        textColor: previewTextColor?.trim() ? previewTextColor : undefined,   
         sheetValues,
         secondAnswerRange,
         brand: brand ?? "poligrama",

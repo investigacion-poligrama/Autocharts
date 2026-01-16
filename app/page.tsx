@@ -31,6 +31,7 @@ export type ChartType =
   | "stackedvertical"
   | "narrowvertbars"
   | "combined"
+  | "mikebar"
   | "singletrack";
 
 export interface DatasetColumn {
@@ -733,7 +734,7 @@ export default function Home() {
             </Button>
 
             <Button variant="outline" onClick={() => handleBrandSelect("deskover")} className="w-full">
-              Deskover
+              Mike Flores
             </Button>
 
             <Button variant="outline" onClick={() => handleBrandSelect("censEdmundSinsa")} className="w-full">

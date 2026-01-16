@@ -218,12 +218,12 @@ export function ChartTypeSelector({
             </>
           )}
 
-          {/* ==== DESKOVER ==== */}
+          {/* ==== Mike Flores ==== */}
           {isDeskover && (
             <>
               <Button
-                variant={chartType === "bar" ? "default" : "outline"}
-                onClick={() => onSelect("bar")}
+                variant={chartType === "mikebar" ? "default" : "outline"}
+                onClick={() => onSelect("mikebar")}
                 className="flex-1"
               >
                 <div className="flex items-center gap-2">
@@ -251,6 +251,17 @@ export function ChartTypeSelector({
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
                   Vertical bar
+                </div>
+              </Button>
+
+              <Button
+                variant={chartType === "tracking" ? "default" : "outline"}
+                onClick={() => onSelect("tracking")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Tracking
                 </div>
               </Button>
             </>

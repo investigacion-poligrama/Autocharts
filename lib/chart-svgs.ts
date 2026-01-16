@@ -14,6 +14,8 @@ import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
 import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
 import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
 import { ChartConfig} from "./chartconfig";
+import { MikebuildBarSvg } from "./export-bar-mikeflores";
+import { getBrandTheme } from "@/lib/brand-theme";
 
 
 export interface ChartSvgArgs {
@@ -521,7 +523,21 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       headerLeftLabel: "Monterrey, Nuevo León", 
     }),
 
-  combined: (args) => {
+    mikebar: (args) => {
+  const theme = getBrandTheme(args.brand ?? "poligrama");
+
+  return MikebuildBarSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor ?? theme.defaultBackground,
+    textColor: args.textColor ?? theme.defaultTextColor,
+  });
+},
+
+combined: (args) => {
   if (!args.combinedCharts) return "";
   const [a, b] = args.combinedCharts;
   if (a.chartType === "combined" || b.chartType === "combined") return "";
@@ -530,111 +546,61 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
   const H = args.height ?? 1080;
 
   const bg = args.backgroundColor ?? "#000";
-  const mainTextColor = args.textColor ?? "#fff";
-  const mutedTextColor = args.textColor ? args.textColor : "#bdbdbd";
 
-  const sheetTitle = args.sheetTitle ?? "";
-  const titleFs = ChartConfig.typography.title.fontSize;
-
-  const marginLeft = 120;
-  const marginRight = 120;
-  const marginTop = 125;
-  const marginBottom = 125;
-
-  const headerFs = 40;
-  const headerLine = headerFs * 1.1;
-
-  const sheetTitleY = marginTop - 24;
-
-  const questionFs = ChartConfig.typography.title.fontSize;
-  const questionY = sheetTitle
-    ? sheetTitleY + headerLine * 2.4
-    : marginTop + headerLine * 2.4;
-
-  const lineY = questionY + 55;
-
-  const question = a.args.title ?? "";
-  const logoX = W - marginRight;
-  const logoY0 = sheetTitleY;
-
-  // -----------------------------
-  // ✅ SPECIAL CASE: TRACKING
-  // -----------------------------
+  // ✅ tracking special layout (1/4 + 3/4)
   const hasTracking = a.chartType === "tracking" || b.chartType === "tracking";
 
-  // Si hay tracking: layout vertical (tracking 75% alto)
   if (hasTracking) {
-    // -----------------------------
-// ✅ SPECIAL CASE: TRACKING (HORIZONTAL 1/4 + 3/4)
-// -----------------------------
-const hasTracking = a.chartType === "tracking" || b.chartType === "tracking";
+    const trackingChart = a.chartType === "tracking" ? a : b;
+    const otherChart = a.chartType === "tracking" ? b : a;
 
-if (hasTracking) {
-  // tracking siempre a la derecha (como tu ejemplo)
-  const trackingChart = a.chartType === "tracking" ? a : b;
-  const otherChart = a.chartType === "tracking" ? b : a;
+    const otherW = Math.round(W * 0.25);
+    const trackingW = W - otherW;
 
-  const otherW = Math.round(W * 0.25);
-  const trackingW = W - otherW;
+    const svgOther = chartSvgBuilders[otherChart.chartType]({
+      ...otherChart.args,
+      width: otherW,
+      height: H,
+      isCombinedMode: true,
+    });
 
-  // ✅ Render: otro (izq) en 1/4
-  const svgOther = chartSvgBuilders[otherChart.chartType]({
-    ...otherChart.args,
-    width: otherW,
-    height: H,
-    isCombinedMode: true,
-  });
+    const svgTracking = chartSvgBuilders[trackingChart.chartType]({
+      ...trackingChart.args,
+      width: trackingW,
+      height: H,
+      isCombinedMode: true,
+      hideLegend: true,
+    });
 
-  // ✅ Render: tracking (der) en 3/4 y sin leyenda
-  const svgTracking = chartSvgBuilders[trackingChart.chartType]({
-    ...trackingChart.args,
-    width: trackingW,
-    height: H,
-    isCombinedMode: true,
-    hideLegend: true,
-  });
+    const innerOther = extractInnerSvg(svgOther);
+    const innerTracking = extractInnerSvg(svgTracking);
 
-  const innerOther = extractInnerSvg(svgOther);
-  const innerTracking = extractInnerSvg(svgTracking);
-
-  return `
+    return `
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="${bg}"/>
-
-  <text x="${marginLeft}" y="${questionY}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${questionFs}"
-    font-weight="400">
-    ${esc(question)}
-  </text>
-
-  <line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}"
-    y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>
-
-
-  <!-- Izquierda: otro chart (1/4) -->
-  <g transform="translate(0,0)">
-    ${innerOther}
-  </g>
-
-  <!-- Derecha: tracking (3/4) -->
-  <g transform="translate(${otherW},0)">
-    ${innerTracking}
-  </g>
+  <g transform="translate(0,0)">${innerOther}</g>
+  <g transform="translate(${otherW},0)">${innerTracking}</g>
 </svg>
 `.trim();
-}
   }
 
-  // -----------------------------
-  // ✅ DEFAULT: tu modo mitad y mitad
-  // -----------------------------
+  // ✅ default 50/50
   const halfW = Math.round(W / 2);
 
-  const svgA = chartSvgBuilders[a.chartType]({ ...a.args, width: halfW, height: H });
-  const svgB = chartSvgBuilders[b.chartType]({ ...b.args, width: halfW, height: H });
+  const svgA = chartSvgBuilders[a.chartType]({
+    ...a.args,
+    width: halfW,
+    height: H,
+    isCombinedMode: true,
+  });
+
+  const svgB = chartSvgBuilders[b.chartType]({
+    ...b.args,
+    width: halfW,
+    height: H,
+    isCombinedMode: true,
+  });
 
   const innerA = extractInnerSvg(svgA);
   const innerB = extractInnerSvg(svgB);
@@ -643,71 +609,11 @@ if (hasTracking) {
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="${bg}"/>
-
-  ${sheetTitle ? `
-  <text x="${marginLeft}" y="${sheetTitleY}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${titleFs}"
-    font-weight="400">
-    ${esc(sheetTitle)}
-  </text>` : ""}
-
-  <text x="${marginLeft}" y="${questionY}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${questionFs}"
-    font-weight="400">
-    ${esc(question)}
-  </text>
-
-  <line x1="${marginLeft}" y1="${lineY}" x2="${W - marginRight}"
-    y2="${lineY}" stroke="${mainTextColor}" stroke-width="2"/>
-
-  <text x="${logoX}" y="${logoY0}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Poligrama.</text>
-
-  <text x="${logoX}" y="${logoY0 + headerLine}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Poder.</text>
-
-  <text x="${logoX}" y="${logoY0 + headerLine * 2}"
-    fill="${mainTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${headerFs}"
-    font-weight="700"
-    text-anchor="end">Ganar.</text>
-
-  <text x="${W - marginRight}" y="${H - marginBottom}"
-    fill="${mutedTextColor}"
-    font-family="${ChartConfig.typography.fontFamily}, Arial, sans-serif"
-    font-size="${ChartConfig.typography.footer.fontSize}"
-    font-weight="500"
-    text-anchor="end">
-    ${esc(ChartConfig.footer)}
-  </text>
-
-  <g transform="translate(0,0)">
-    ${innerA}
-  </g>
-
-  <g transform="translate(${halfW},0)">
-    ${innerB}
-  </g>
+  <g transform="translate(0,0)">${innerA}</g>
+  <g transform="translate(${halfW},0)">${innerB}</g>
 </svg>
 `.trim();
 },
-
-
-
-
 
 
 };
