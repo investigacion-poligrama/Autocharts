@@ -244,17 +244,6 @@ export function ChartTypeSelector({
               </Button>
 
               <Button
-                variant={chartType === "stackedvertical" ? "default" : "outline"}
-                onClick={() => onSelect("stackedvertical")}
-                className="flex-1"
-              >
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Vertical bar
-                </div>
-              </Button>
-
-              <Button
                 variant={chartType === "tracking" ? "default" : "outline"}
                 onClick={() => onSelect("tracking")}
                 className="flex-1"
@@ -262,6 +251,17 @@ export function ChartTypeSelector({
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Tracking
+                </div>
+              </Button>
+
+              <Button
+                variant={chartType === "trackingpills" ? "default" : "outline"}
+                onClick={() => onSelect("trackingpills")}
+                className="flex-1"
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                 T c/leyenda
                 </div>
               </Button>
             </>

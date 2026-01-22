@@ -32,6 +32,8 @@ export type ChartType =
   | "narrowvertbars"
   | "combined"
   | "mikebar"
+  |  "trackingpills"
+  | "table"
   | "singletrack";
 
 export interface DatasetColumn {

@@ -16,6 +16,11 @@ import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
 import { ChartConfig} from "./chartconfig";
 import { MikebuildBarSvg } from "./export-bar-mikeflores";
 import { getBrandTheme } from "@/lib/brand-theme";
+import { buildTrackingMikeFloresSvg } from "./export-tracking-mike-flores"
+import { buildTrackingWithPillsMikeFloresSvg } from "./export-trackingwpills-mikeflores";
+import { buildTableMikeFloresSvg } from "./export-table-mikeflores";
+import { buildDonutMikeFloresSvg } from "./export-donut-mikeflores";
+
 
 
 export interface ChartSvgArgs {
@@ -333,17 +338,33 @@ export type ChartSvgBuilder = (args: ChartSvgArgs) => string;
 
 export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
   
-  donut: (args) =>
-    buildDonutSvg({
-      data: args.data,
-      title: args.title,
-      customColors: args.customColors,
-      sheetTitle: args.sheetTitle,
+  donut: (args) => {
+  const isMike = args.brand === "deskover";
+
+  if (isMike) {
+    return buildDonutMikeFloresSvg({
+      ...args,
       width: args.width,
       height: args.height,
       backgroundColor: args.backgroundColor,
       textColor: args.textColor,
-    }),
+      customColors: args.customColors,
+      isCombinedMode: args.isCombinedMode,
+    });
+  }
+
+  return buildDonutSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+  });
+},
+
 
   bar: (args) =>
   buildBarSvg({
@@ -412,23 +433,54 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       textColor: args.textColor,
     }),
 
-  tracking: (args) =>
-    buildTrackingSvg({
-      data: args.data,
-      title: args.title,
-      columns: args.columns ?? [],
-      customColors: args.customColors,
-      sheetTitle: args.sheetTitle,
-      width: args.width,
-      height: args.height,
-      inputMode: args.inputMode,
+  tracking: (args) => {
+  const isMike = args.brand === "deskover";
+  if (isMike) {
+    return buildTrackingMikeFloresSvg({
+      ...args,
       sheetValues: args.sheetValues,
       answerRange: args.answerRange,
-      backgroundColor: args.backgroundColor,
-      textColor: args.textColor,
       isCombinedMode: args.isCombinedMode,
       hideLegend: args.hideLegend,
-    }),
+    });
+  }
+
+  return buildTrackingSvg({
+    data: args.data,
+    title: args.title,
+    columns: args.columns ?? [],
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    inputMode: args.inputMode,
+    sheetValues: args.sheetValues,
+    answerRange: args.answerRange,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+    isCombinedMode: args.isCombinedMode,
+    hideLegend: args.hideLegend,
+  });
+},
+
+trackingpills: (args) => {
+  const isMike = args.brand === "deskover";
+  if (isMike) {
+    return buildTrackingWithPillsMikeFloresSvg({
+      ...args,
+      sheetValues: args.sheetValues,
+      answerRange: args.answerRange,
+      isCombinedMode: args.isCombinedMode,
+      // si tu builder soporta hideLegend, pásalo también:
+      hideLegend: args.hideLegend,
+    });
+  }
+
+  // fallback fuera de DeskoveR (opcional):
+  return chartSvgBuilders.tracking(args);
+},
+
+
 
   mediumdonut: (args) =>
     buildMediumDonutSvg({
@@ -536,6 +588,18 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
     textColor: args.textColor ?? theme.defaultTextColor,
   });
 },
+
+table: (args) => {
+  const isMike = args.brand === "deskover";
+  if (!isMike) return ""; // o una versión poligrama si quieres
+  return buildTableMikeFloresSvg({
+    ...args,
+    sheetValues: args.sheetValues,
+    answerRange: args.answerRange,
+    isCombinedMode: args.isCombinedMode,
+  });
+},
+
 
 combined: (args) => {
   if (!args.combinedCharts) return "";
