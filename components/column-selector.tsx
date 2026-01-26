@@ -134,7 +134,7 @@ export function ColumnSelector({
     useState<RangePickerTarget | null>(null);
 
   const availableColors: Record<string, string> = {
-    Si: "#00a651",
+    Si: "#01793B",
     No: "#e10814",
     Neutral: "#9d9d9c",
     Algoefectivo: "#63c26d",
