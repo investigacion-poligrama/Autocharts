@@ -1,6 +1,5 @@
-import { ChartConfig } from "@/lib/chartconfig";
+// export-bar-mikeflores.ts
 import type { FrequencyData } from "@/app/page";
-import { getBrandTheme } from "@/lib/brand-theme";
 
 type MikeBuildBarSvgArgs = {
   data: FrequencyData[];
@@ -8,6 +7,7 @@ type MikeBuildBarSvgArgs = {
   customColors?: Record<string, string>;
   width?: number;
   height?: number;
+  isCombinedMode?: boolean;
   backgroundColor?: string; // default: #232323
   textColor?: string; // default: #ffffff
 };
@@ -17,17 +17,16 @@ const CANVAS_H = 1080;
 
 // Paleta (puedes ajustar el orden si quieres que coincida exacto con partidos)
 const PALETTE = [
-  "#c8102e", 
-  "#f39c12", 
-  "#0b6b3a", 
-  "#2c2f7a", 
-  "#ff2d55", 
-  "#9acd32", 
+  "#c8102e",
+  "#f39c12",
+  "#0b6b3a",
+  "#2c2f7a",
+  "#ff2d55",
+  "#9acd32",
   "#8d6e63",
 ];
 
-const FONT_FUTURA =
-   "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
+const FONT_FUTURA = "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
 
 const esc = (s: string) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -78,7 +77,6 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
       cur = w;
 
       if (lines.length === maxLines - 1) {
-        // última línea: lo que falta (sin pasarse mucho)
         const rest = [cur, ...words.slice(words.indexOf(w) + 1)].join(" ");
         lines.push(rest);
         return lines;
@@ -90,11 +88,9 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
 
   if (cur) lines.push(cur);
 
-  // si se pasó, compacta en maxLines
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(" ")];
 }
-
 
 export function MikebuildBarSvg({
   data,
@@ -103,98 +99,140 @@ export function MikebuildBarSvg({
   width,
   height,
   backgroundColor,
+  isCombinedMode,
   textColor,
 }: MikeBuildBarSvgArgs): string {
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
-const bg =
-  backgroundColor && backgroundColor.trim() && backgroundColor !== "transparent"
-    ? backgroundColor
-    : "#232323";
+  const bg =
+    backgroundColor && backgroundColor.trim() && backgroundColor !== "transparent"
+      ? backgroundColor
+      : "#232323";
 
-const mainText =
-  textColor && textColor.trim() && textColor !== "transparent"
-    ? textColor
-    : "#ffffff";
-
+  const mainText =
+    textColor && textColor.trim() && textColor !== "transparent" ? textColor : "#ffffff";
 
   // ---- Layout (calibrado para verse como la foto) ----
   const isVertical = H > W;
-  const titleFontSize = Math.round(
-  isVertical ? W * 0.04 : H * 0.060
-);
 
+  const titleFontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
   const titleTop = Math.round(H * 0.17);
 
   // Bloque central de barras
-const blockWidth = Math.round(W * 0.52);
-const barX0 = Math.round((W - blockWidth) / 2);
+  const blockWidth = Math.round(W * 0.52);
+  const barX0 = Math.round((W - blockWidth) / 2);
 
-const pctGap = Math.round(W * 0.02);   // espacio entre barra y %
-const pctZone = Math.round(W * 0.08);  // “zona” donde vive el % (más holgada)
+  const pctGap = Math.round(W * 0.02);
+  const pctZone = Math.round(W * 0.08);
 
-const barW = blockWidth - pctGap - pctZone; // ✅ ancho real de la barra
-const barX1 = barX0 + barW;
+  const barW = blockWidth - pctGap - pctZone;
+  const barX1 = barX0 + barW;
 
-// % va en la zona derecha
-const pctX = barX1 + pctGap + pctZone; // como usas text-anchor=end, esto queda bien
+  // % va en la zona derecha
+  const pctX = barX1 + pctGap + pctZone;
 
+  const rows = Math.max(1, data.length);
 
-const rows = Math.max(1, data.length);
+  // proporciones internas
+  const gapRatio = 0.55;
+  const labelRatio = 0.55;
+  const labelGapRatio = 0.20;
 
-// proporciones internas (ajústalas a gusto)
-const gapRatio = 0.55;      // gap relativo a bar
-const labelRatio = 0.55;    // labelFont relativo a bar
+  const maxTitleChars = isVertical ? 26 : 34;
+  const titleLines = wrapTitle(title, maxTitleChars, 3);
+  const titleLineGap = Math.round(titleFontSize * 0.16);
 
-// Queremos: rows * (labelBlockH + barH) + (rows-1)*rowGap <= barsAreaH
-// donde labelBlockH = labelFont + labelGap
-// labelFont = barH * labelRatio
-// labelGap  = barH * 0.20 (por ejemplo)
-// rowGap    = barH * gapRatio
+  const titleBlockH =
+    titleLines.length * titleFontSize + (titleLines.length - 1) * titleLineGap;
 
-const labelGapRatio = 0.20;
+  // ✅ faltaba esto en tu intento
+  const titleStartY = titleTop - Math.round(titleBlockH / 2);
 
-const maxTitleChars = isVertical ? 26 : 34;
-const titleLines = wrapTitle(title, maxTitleChars, 3);
-const titleLineGap = Math.round(titleFontSize * 0.16);
+  // Margen superior + “aire” debajo del título
+  const topPad = Math.round(H * 0.08);
+  const afterTitleGap = Math.round(H * 0.05);
 
-const titleBlockH =
-  titleLines.length * titleFontSize + (titleLines.length - 1) * titleLineGap;
+  const denomPerRow = labelRatio + labelGapRatio + 1;
+  const denomTotal = rows * denomPerRow + (rows - 1) * gapRatio;
 
-// Margen superior + “aire” debajo del título
-const topPad = Math.round(H * 0.08);
-const afterTitleGap = Math.round(H * 0.05);
-
-const denomPerRow = (labelRatio + labelGapRatio + 1); // labelFont + labelGap + bar
-const denomTotal =
-  rows * denomPerRow + (rows - 1) * gapRatio;
   const barsAreaTop = topPad + titleBlockH + afterTitleGap;
-const bottomPad = Math.round(H * 0.10);
-const barsAreaH = Math.max(200, H - barsAreaTop - bottomPad);
-// barH que cabe
-let barH = Math.floor(barsAreaH / denomTotal);
+  const bottomPad = Math.round(H * 0.10);
+  const barsAreaH = Math.max(200, H - barsAreaTop - bottomPad);
 
-// clamps para que no se vea ridículo
-barH = Math.max(18, Math.min(barH, Math.round(H * 0.055)));
+  let barH = Math.floor(barsAreaH / denomTotal);
+  barH = Math.max(18, Math.min(barH, Math.round(H * 0.055)));
 
-const rowGap = Math.round(barH * gapRatio);
-const labelFont = Math.round(barH * labelRatio);
-const labelGap = Math.round(barH * labelGapRatio);
-const labelBlockH = labelFont + labelGap;
-const firstRowTop = barsAreaTop; // empieza justo debajo del título
+  const rowGap = Math.round(barH * gapRatio);
+  const labelFont = Math.round(barH * labelRatio);
+  const labelGap = Math.round(barH * labelGapRatio);
+  const labelBlockH = labelFont + labelGap;
+  const firstRowTop = barsAreaTop;
 
-// (opcional) % font también relativo a barH para que no explote
-const pctFont = Math.round(barH * 0.78); // ✅ más parecido al PDF
-
-
-  const r = Math.round(barH / 2); // rounded ends
+  const pctFont = Math.round(barH * 0.78);
+  const r = Math.round(barH / 2);
 
   const normalized = data.map((d) => ({
     ...d,
     value: clampPercent((d as any).percentage ?? (d as any).value),
     label: String((d as any).label ?? ""),
   }));
+
+  // ---- Preconstruye barras (ANTES de escribir chart-content) ----
+  const bars: string[] = [];
+
+  normalized.forEach((item, idx) => {
+    const rowTop = firstRowTop + idx * (labelBlockH + barH + rowGap);
+    const labelY = rowTop;
+    const barTop = rowTop + labelBlockH;
+    const yMid = barTop + barH / 2;
+
+    const color = customColors[item.label] ?? PALETTE[idx % PALETTE.length];
+    const trackColor = darkenHex(color, 0.55);
+    const fillW = Math.round(((barX1 - barX0) * item.value) / 100);
+
+    // LABEL
+    bars.push(
+      `<text x="${barX0}" y="${labelY + labelFont}"
+        fill="${mainText}"
+        font-family="${FONT_FUTURA}"
+        font-size="${labelFont}"
+        font-weight="400"
+        font-style="italic"
+        text-anchor="start"
+        dominant-baseline="alphabetic"
+      >${esc(item.label)}</text>`
+    );
+
+    // TRACK
+    bars.push(
+      `<rect x="${barX0}" y="${barTop}" width="${barX1 - barX0}" height="${barH}"
+        rx="${r}" ry="${r}"
+        fill="${trackColor}"
+        fill-opacity="0.55"
+      />`
+    );
+
+    // FILL
+    bars.push(
+      `<rect x="${barX0}" y="${barTop}" width="${fillW}" height="${barH}"
+        rx="${r}" ry="${r}"
+        fill="${color}"
+      />`
+    );
+
+    // %
+    bars.push(
+      `<text x="${pctX}" y="${yMid}"
+        fill="${mainText}"
+        font-family="${FONT_FUTURA}"
+        font-size="${pctFont}"
+        font-weight="800"
+        text-anchor="end"
+        dominant-baseline="middle"
+      >${esc(formatPct(item.value))}</text>`
+    );
+  });
 
   // ---- SVG parts ----
   const parts: string[] = [];
@@ -204,14 +242,11 @@ const pctFont = Math.round(barH * 0.78); // ✅ más parecido al PDF
     `<rect width="100%" height="100%" fill="${bg}"/>`
   );
 
-  // ---- Título centrado (2 líneas máx) ----
-
-
-  const titleStartY = titleTop - Math.round(titleBlockH / 2);
-
+  // ---- Title markup (lo vamos a meter fuera o dentro según combined) ----
+  const titleMarkup: string[] = [];
   titleLines.forEach((line, i) => {
     const y = titleStartY + i * (titleFontSize + titleLineGap);
-    parts.push(
+    titleMarkup.push(
       `<text x="${Math.round(W / 2)}" y="${y}"
         fill="${mainText}"
         font-family="${FONT_FUTURA}"
@@ -223,69 +258,46 @@ const pctFont = Math.round(barH * 0.78); // ✅ más parecido al PDF
     );
   });
 
-  // ---- Contenido que se extrae en combined mode ----
-  const bars: string[] = [];
+  // ✅ normal: el título va fuera del chart-content
+  if (!isCombinedMode) parts.push(...titleMarkup);
 
-  normalized.forEach((item, idx) => {
-    const rowTop = firstRowTop + idx * (labelBlockH + barH + rowGap);
-  const labelY = rowTop;               // top del bloque de label
-  const barTop = rowTop + labelBlockH; // top de la barra (debajo del label)
-  const yMid = barTop + barH / 2;
-
-  const color = customColors[item.label] ?? PALETTE[idx % PALETTE.length];
-  const trackColor = darkenHex(color, 0.55);
-  const fillW = Math.round(((barX1 - barX0) * item.value) / 100);
-
-  // LABEL (más chico y no bold)
-  bars.push(
-    `<text
-      x="${barX0}"
-      y="${labelY + labelFont}"
-      fill="${mainText}"
-      font-family="${FONT_FUTURA}"
-      font-size="${labelFont}"
-      font-weight="400"
-      font-style="italic"
-      text-anchor="start"
-      dominant-baseline="alphabetic"
-    >${esc(item.label)}</text>`
-  );
-
-  // TRACK
-  bars.push(
-    `<rect x="${barX0}" y="${barTop}" width="${barX1 - barX0}" height="${barH}"
-      rx="${r}" ry="${r}"
-      fill="${trackColor}"
-      fill-opacity="0.55"
-    />`
-  );
-
-  // FILL
-  bars.push(
-    `<rect x="${barX0}" y="${barTop}" width="${fillW}" height="${barH}"
-      rx="${r}" ry="${r}"
-      fill="${color}"
-    />`
-  );
-
-  // %
-  bars.push(
-    `<text
-      x="${pctX}"
-      y="${yMid}"
-      fill="${mainText}"
-      font-family="${FONT_FUTURA}"
-      font-size="${pctFont}"
-      font-weight="800"
-      text-anchor="end"
-      dominant-baseline="middle"
-    >${esc(formatPct(item.value))}</text>`
-  );
-});
-
-
+  // ---- chart-content (lo que extraes en combined) ----
   parts.push(`<g id="chart-content">`);
+
+  // ✅ combined: el título debe ir DENTRO del chart-content
+  if (isCombinedMode) parts.push(...titleMarkup);
+
+  // ---- bounds para combined (crop real) ----
+const boundsY = Math.max(0, titleStartY);
+
+// izquierda: donde empiezan labels/barras
+const boundsX = Math.max(0, barX0 - Math.round(W * 0.02)); // un pelín de aire
+
+// derecha: el % está con text-anchor="end" en pctX
+const boundsRight = Math.min(W, pctX + Math.round(W * 0.02)); // aire a la derecha
+
+const boundsW = Math.max(1, boundsRight - boundsX);
+
+
+  const boundsBottom = Math.min(
+    H,
+    firstRowTop +
+      rows * (labelBlockH + barH) +
+      (rows - 1) * rowGap +
+      Math.round(H * 0.06)
+  );
+
+  const boundsH = Math.max(1, boundsBottom - boundsY);
+
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}"
+      fill="none" opacity="0"
+    />`
+  );
+
+  // contenido
   parts.push(bars.join("\n"));
+
   parts.push(`</g>`);
   parts.push(`</svg>`);
 

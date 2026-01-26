@@ -14,11 +14,11 @@ function clampPercent(raw: unknown): number {
     typeof raw === "number"
       ? raw
       : typeof raw === "string"
-      ? Number(raw.replace("%", "").replace(",", ".").trim())
-      : 0;
+        ? Number(raw.replace("%", "").replace(",", ".").trim())
+        : 0;
 
   let v = Number.isFinite(n) ? n : 0;
-  if (v > 0 && v <= 1) v *= 100; // 0-1 -> 0-100
+  if (v > 0 && v <= 1) v *= 100; // 0–1 -> 0–100
   return Math.max(0, Math.min(100, v));
 }
 
@@ -42,10 +42,22 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
       cur = test;
     }
   }
-  if (cur) lines.push(cur);
 
+  if (cur) lines.push(cur);
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(" ")];
+}
+
+type WrappedTitle = { lines: string[]; fontSize: number; blockHeight: number };
+
+function prepareTitleMike(title: string, W: number, H: number): WrappedTitle {
+  const isVertical = H > W;
+  const fontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
+  const maxChars = isVertical ? 26 : 40;
+  const lines = wrapTitle(title || "", maxChars, 3);
+  const lineGap = Math.round(fontSize * 0.16);
+  const blockHeight = lines.length * fontSize + (lines.length - 1) * lineGap;
+  return { lines, fontSize, blockHeight };
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -58,7 +70,6 @@ function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle
   const start = polarToCartesian(cx, cy, r, endAngle);
   const end = polarToCartesian(cx, cy, r, startAngle);
   const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
 }
 
@@ -78,7 +89,7 @@ function basicMessageSvg(message: string, bg: string, text: string): string {
   ].join("\n");
 }
 
-// Paleta tipo PDF (verde, rojo, naranja, azul, morado, gris)
+// Paleta tipo PDF
 const FALLBACK_PALETTE = ["#39a935", "#b81d2c", "#f39c12", "#1e88e5", "#7e57c2", "#9e9e9e"];
 
 function normalizeKey(s: string) {
@@ -95,7 +106,7 @@ function getSliceColor(label: string, customColors: Record<string, string>, idx:
   // exact
   if (customColors?.[label]) return customColors[label];
 
-  // normalized match
+  // normalized
   const target = normalizeKey(label);
   const found = Object.keys(customColors || {}).find((k) => normalizeKey(k) === target);
   if (found) return customColors[found];
@@ -119,6 +130,7 @@ export function buildDonutMikeFloresSvg({
   height,
   backgroundColor,
   textColor,
+  isCombinedMode,
   customColors = {},
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
@@ -130,9 +142,7 @@ export function buildDonutMikeFloresSvg({
       : "#232323";
 
   const mainText =
-    textColor && textColor.trim() && textColor !== "transparent"
-      ? textColor
-      : "#ffffff";
+    textColor && textColor.trim() && textColor !== "transparent" ? textColor : "#ffffff";
 
   if (!data?.length) return basicMessageSvg("No hay datos para el donut.", bg, mainText);
 
@@ -146,66 +156,44 @@ export function buildDonutMikeFloresSvg({
 
   if (!rawItems.length) return basicMessageSvg("No hay datos válidos para el donut.", bg, mainText);
 
-  // Normalize so sum = 100 (Sheets a veces suma 99.9 o 100.1)
+  // Normalize so sum = 100
   const sum = rawItems.reduce((a, b) => a + b.value, 0);
   const items = rawItems.map((it) => ({
     ...it,
     value: sum > 0 ? (it.value / sum) * 100 : it.value,
   }));
 
-  // ----- Layout (PDF-ish) -----
-type WrappedTitle = { lines: string[]; fontSize: number; blockHeight: number };
+  // ----- Title -----
+  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } = prepareTitleMike(
+    title || "",
+    W,
+    H
+  );
 
-function prepareTitleMike(title: string, W: number, H: number): WrappedTitle {
-  const isVertical = H > W;
-  const fontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
-  const maxChars = isVertical ? 26 : 40;
-  const lines = wrapTitle(title || "", maxChars, 3); // ✅ 3 líneas como los demás
-  const lineGap = Math.round(fontSize * 0.16);
-  const blockHeight = lines.length * fontSize + (lines.length - 1) * lineGap;
-  return { lines, fontSize, blockHeight };
-}
+  const titleLineGap = Math.round(titleFs * 0.16);
+  const titleTop = Math.round(H * 0.17);
+  const titleStartY = titleTop - Math.round(titleBlockH / 2);
+  const titleBottomY = titleStartY + titleBlockH;
 
-const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
-  prepareTitleMike(title || "", W, H);
+  // ----- Donut geometry (posicionado debajo del título) -----
+  const gapAfterTitle = Math.round(H * 0.08);
+  const cx = Math.round(W * 0.50);
 
-const titleLineGap = Math.round(titleFs * 0.16);
+  const outerR = Math.round(Math.min(W, H) * 0.205);
+  const strokeW = Math.round(outerR * 0.33);
+  const r = outerR - strokeW / 2;
 
-const titleTop = Math.round(H * 0.17);
-const titleStartY = titleTop - Math.round(titleBlockH / 2);
-
-  // Center donut (fix: centered)
-  // después de calcular titleStartY, titleBlockH, titleLineGap...
-
-// 1) dónde termina el bloque del título (en px)
-const titleBottomY =
-  titleStartY + titleBlockH; // dominant-baseline="hanging"
-
-// 2) gap entre título y donut (ajusta este número)
-const gapAfterTitle = Math.round(H * 0.08); // prueba 0.05–0.07
-
-// 3) sube el donut: cy se calcula desde el título
-const cx = Math.round(W * 0.50);
-
-const outerR = Math.round(Math.min(W, H) * 0.205);
-const strokeW = Math.round(outerR * 0.33);
-const r = outerR - strokeW / 2;
-
-// cy basado en el título (en vez de H*0.58)
-const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
-
+  const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
 
   // Callout styling
-  const labelFs = Math.round(H * 0.02); // etiqueta (Buena/Regular/Mala)
-  const pctFs = Math.round(H * 0.030);   // porcentaje grande
+  const labelFs = Math.round(H * 0.02);
+  const pctFs = Math.round(H * 0.030);
   const calloutW = Math.max(6, Math.round(H * 0.004));
 
-  const elbow = Math.round(W * 0.018);
   const outLen = Math.round(W * 0.040);
 
-  // Radii for anchors/callouts
-  const anchorR = outerR;                 // punto en borde externo
-  const elbowR = outerR + Math.round(H * 0.020); // primer “push” afuera
+  const anchorR = outerR;
+  const elbowR = outerR + Math.round(H * 0.020);
 
   // Build slice angles
   let ang = 0;
@@ -221,29 +209,20 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
     return { label: it.label, value: it.value, color, startAngle, endAngle, midAngle };
   });
 
-  // Sort callouts by Y (helps spacing)
+  // Callouts (ordenados por Y y con anti-colisión)
   const callouts = slices
     .map((s, idx) => {
       const a = s.midAngle;
       const anchor = polarToCartesian(cx, cy, anchorR, a);
       const elbowPt = polarToCartesian(cx, cy, elbowR, a);
 
-      const isRight = Math.cos(((a - 90) * Math.PI) / 180) > 0; // based on SVG angle
+      const isRight = Math.cos(((a - 90) * Math.PI) / 180) > 0;
       const endX = elbowPt.x + (isRight ? outLen : -outLen);
 
-      return {
-        idx,
-        slice: s,
-        anchor,
-        elbow: elbowPt,
-        isRight,
-        endX,
-        y: elbowPt.y,
-      };
+      return { idx, slice: s, anchor, elbow: elbowPt, isRight, endX, y: elbowPt.y };
     })
     .sort((a, b) => a.y - b.y);
 
-  // Simple vertical collision-avoidance
   const minGap = Math.round(H * 0.060);
   for (let i = 1; i < callouts.length; i++) {
     if (callouts[i].y - callouts[i - 1].y < minGap) {
@@ -251,7 +230,6 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
     }
   }
 
-  // Clamp callout Y into safe zone
   const yMin = Math.round(H * 0.30);
   const yMax = Math.round(H * 0.86);
   callouts.forEach((c) => {
@@ -266,10 +244,11 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // Title
+  // Title markup (fuera o dentro según combined)
+  const titleMarkup: string[] = [];
   titleLines.forEach((line, i) => {
     const y = titleStartY + i * (titleFs + titleLineGap);
-        parts.push(
+    titleMarkup.push(
       `<text x="${Math.round(W / 2)}" y="${y}"
         fill="${mainText}"
         font-family="${FONT_FUTURA}"
@@ -280,7 +259,23 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
     );
   });
 
+  if (!isCombinedMode) parts.push(...titleMarkup);
+
+  // chart-content (incluye título en combined)
   parts.push(`<g id="chart-content">`);
+  if (isCombinedMode) parts.push(...titleMarkup);
+
+  // content-bounds para crop en combined
+  const boundsX = 0;
+  const boundsY = Math.max(0, titleStartY);
+  const boundsW = W;
+  const boundsBottom = Math.min(H, cy + outerR + Math.round(H * 0.12));
+  const boundsH = Math.max(1, boundsBottom - boundsY);
+
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}"
+      fill="none" opacity="0" />`
+  );
 
   // Slices
   slices.forEach((s) => {
@@ -295,12 +290,10 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
   callouts.forEach((c) => {
     const s = c.slice;
 
-    // elbow point with adjusted y (so the L aligns with collision-avoidance)
     const elbowX = c.elbow.x;
     const elbowY = c.y;
     const endX = c.endX;
 
-    // 3-segment: anchor -> elbow (original) -> adjustedY -> endX
     parts.push(
       `<path d="M ${c.anchor.x} ${c.anchor.y}
                L ${c.elbow.x} ${c.elbow.y}
@@ -315,33 +308,32 @@ const cy = Math.round(titleBottomY + gapAfterTitle + outerR);
     const textX = endX + (c.isRight ? Math.round(W * 0.006) : -Math.round(W * 0.006));
     const align = c.isRight ? "start" : "end";
 
-const labelOffsetY = Math.round(H * 0.014); // antes 0.020
-const pctOffsetY   = Math.round(H * 0.018); // antes 0.030
+    const labelOffsetY = Math.round(H * 0.014);
+    const pctOffsetY = Math.round(H * 0.018);
 
-// label
-parts.push(
-  `<text x="${textX}" y="${elbowY - labelOffsetY}"
-    fill="${mainText}"
-    font-family="${FONT_FUTURA}"
-    font-size="${labelFs}"
-    font-style="italic"
-    font-weight="700"
-    text-anchor="${align}"
-    dominant-baseline="alphabetic">${esc(label)}</text>`
-);
+    // label
+    parts.push(
+      `<text x="${textX}" y="${elbowY - labelOffsetY}"
+        fill="${mainText}"
+        font-family="${FONT_FUTURA}"
+        font-size="${labelFs}"
+        font-style="italic"
+        font-weight="700"
+        text-anchor="${align}"
+        dominant-baseline="alphabetic">${esc(label)}</text>`
+    );
 
-// percent
-parts.push(
-  `<text x="${textX}" y="${elbowY + pctOffsetY}"
-    fill="${mainText}"
-    font-family="${FONT_FUTURA}"
-    font-size="${pctFs}"
-    font-weight="400"
-    font-style="italic"
-    text-anchor="${align}"
-    dominant-baseline="alphabetic">${esc(pct)}</text>`
-);
-
+    // percent
+    parts.push(
+      `<text x="${textX}" y="${elbowY + pctOffsetY}"
+        fill="${mainText}"
+        font-family="${FONT_FUTURA}"
+        font-size="${pctFs}"
+        font-weight="400"
+        font-style="italic"
+        text-anchor="${align}"
+        dominant-baseline="alphabetic">${esc(pct)}</text>`
+    );
   });
 
   parts.push(`</g>`);

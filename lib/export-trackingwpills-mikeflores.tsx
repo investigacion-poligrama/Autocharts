@@ -1,11 +1,11 @@
+// export-trackingwpills-mikeflores.tsx
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
 import { ChartConfig } from "@/lib/chartconfig";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-const FONT_FUTURA =
-  "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
+const FONT_FUTURA = "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
 
 const esc = (s: string) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -43,7 +43,7 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
 function prepareTitleMike(title: string, W: number, H: number): WrappedTitle {
   const isVertical = H > W;
   const fontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
-  const maxChars = isVertical ? 26 : 40;
+  const maxChars = isVertical ? 26 : 34;
   const lines = wrapTitle(title, maxChars, 3);
   const lineGap = Math.round(fontSize * 0.16);
   const blockHeight = lines.length * fontSize + (lines.length - 1) * lineGap;
@@ -103,7 +103,7 @@ function monthToAbbr(raw: string): string {
   };
 
   const first3 = s.slice(0, 3).toUpperCase();
-  const already = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+  const already = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
   if (already.includes(first3)) return first3;
 
   return m[s] ?? first3;
@@ -121,7 +121,6 @@ function extractTrackingDataSummary(values: any[][], range?: string) {
   }
 
   const { rowStart, rowEnd, colStart, colEnd } = parsed;
-
   const headerRow = values[rowStart - 1] || [];
 
   const months: string[] = [];
@@ -237,7 +236,6 @@ function drawPillsLegend({
   const gapX = Math.round(W * 0.035);
   const gapY = Math.round(H * 0.020);
 
-  // pills más “chunky” como el pdf
   const pillH = Math.round(H * 0.05);
   const pillW = Math.round(W * 0.30);
   const rx = Math.round(pillH / 2);
@@ -245,10 +243,8 @@ function drawPillsLegend({
   const rows = Math.ceil(categories.length / cols);
   const totalH = rows * pillH + (rows - 1) * gapY;
 
-  // centra verticalmente en el bloque disponible
   const startY = topY + Math.max(0, (maxH - totalH) / 2);
 
-  // centra horizontalmente en el canvas
   const totalW = cols * pillW + (cols - 1) * gapX;
   const startX = Math.round((W - totalW) / 2);
 
@@ -263,16 +259,12 @@ function drawPillsLegend({
 
     const c = colorForSeries(cat.name, customColors);
 
-    parts.push(
-      `<rect x="${x}" y="${y}" width="${pillW}" height="${pillH}" rx="${rx}" ry="${rx}" fill="${c}" />`
-    );
+    parts.push(`<rect x="${x}" y="${y}" width="${pillW}" height="${pillH}" rx="${rx}" ry="${rx}" fill="${c}" />`);
 
-    // nombre (1–2 líneas, centrado)
     const lines = wrapTitle(cat.name, 18, 2);
     const lineGap = 1;
     const blockH = lines.length * nameFs + (lines.length - 1) * lineGap;
 
-    // baseline al centro del pill
     const cy = y + pillH / 2 - blockH / 2 + nameFs;
 
     parts.push(
@@ -318,57 +310,42 @@ export function buildTrackingWithPillsMikeFloresSvg({
       : "#232323";
 
   const mainText =
-    textColor && textColor.trim() && textColor !== "transparent"
-      ? textColor
-      : "#ffffff";
+    textColor && textColor.trim() && textColor !== "transparent" ? textColor : "#ffffff";
 
   const trackingData = extractTrackingDataSummary(sheetValues || [], answerRange);
-  if (!trackingData) {
-    return basicMessageSvg("No se pudo leer la tabla de tracking.", bg, mainText);
-  }
+  if (!trackingData) return basicMessageSvg("No se pudo leer la tabla de tracking.", bg, mainText);
 
   let { months, categories } = trackingData;
   months = months.map(monthToAbbr);
 
-  // Respeta orden DragList
   const dragOrder = (data || []).map((d) => d.label).filter(Boolean);
   if (dragOrder.length) {
     const byName = new Map(categories.map((c) => [c.name, c]));
     categories = dragOrder.map((l) => byName.get(l)).filter(Boolean) as any;
   }
 
-  if (!categories.length || !months.length) {
-    return basicMessageSvg("No hay datos para graficar.", bg, mainText);
-  }
+  if (!categories.length || !months.length) return basicMessageSvg("No hay datos para graficar.", bg, mainText);
 
   /* ---------------- layout ---------------- */
 
-  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
-    prepareTitleMike(title, W, H);
+  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } = prepareTitleMike(title, W, H);
 
   const titleTop = Math.round(H * 0.17);
   const titleLineGap = Math.round(titleFs * 0.16);
   const titleStartY = titleTop - Math.round(titleBlockH / 2);
 
-  // Ejes y área de plot (tipo PDF)
   const axisX = Math.round(W * 0.24);
   const plotX0 = axisX;
   const plotX1 = Math.round(W * 0.90);
   const plotW = plotX1 - plotX0;
 
-  // ✅ “sube” el gráfico pegado al título
+  // chart pegado al título
   const contentTop = Math.round(H * 0.30);
 
-  // ✅ reservamos espacio para pills (solo cuando NO es combined)
-  // ✅ reservamos MÁS espacio para pills (solo cuando NO es combined)
-const pillsH = isCombinedMode ? 0 : Math.round(H * 0.30); // antes 0.20
+  // espacio para pills (solo NO combined)
+  const pillsH = isCombinedMode ? 0 : Math.round(H * 0.30);
 
-// ✅ baja el bottom del plot para dejar aire a las pills
-const contentBottom = isCombinedMode
-  ? Math.round(H * 0.72)
-  : Math.round(H * 0.62); // antes 0.72
-
-
+  const contentBottom = isCombinedMode ? Math.round(H * 0.72) : Math.round(H * 0.62);
   const plotH = Math.max(220, contentBottom - contentTop);
   const xAxisY = contentTop + plotH;
 
@@ -386,7 +363,6 @@ const contentBottom = isCombinedMode
     return contentTop + plotH - t * plotH;
   };
 
-  // ✅ este innerMarginX es lo que da “aire” al final del eje X (como tu PDF)
   const innerMarginX = Math.round(plotW * 0.14);
   const usableW = Math.max(50, plotW - innerMarginX * 2);
   const xStep = monthsCount > 1 ? usableW / (monthsCount - 1) : 0;
@@ -394,12 +370,11 @@ const contentBottom = isCombinedMode
   const xAt = (i: number) =>
     monthsCount > 1 ? plotX0 + innerMarginX + i * xStep : plotX0 + plotW / 2;
 
-  // styles
   const axisStroke = mainText;
   const axisW = 2;
 
   const pointR = Math.max(7, Math.round(H * 0.008));
-  const strokeW = Math.max(3, Math.round(H * 0.006)); // ✅ más gruesas
+  const strokeW = Math.max(3, Math.round(H * 0.006));
   const pctFs = Math.max(18, Math.round(H * 0.017));
   const monthFs = Math.max(22, Math.round(H * 0.020));
 
@@ -412,10 +387,11 @@ const contentBottom = isCombinedMode
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // Title
+  // Title markup
+  const titleMarkup: string[] = [];
   titleLines.forEach((line, i) => {
     const y = titleStartY + i * (titleFs + titleLineGap);
-    parts.push(
+    titleMarkup.push(
       `<text x="${Math.round(W / 2)}" y="${y}"
         fill="${mainText}"
         font-family="${FONT_FUTURA}"
@@ -426,9 +402,33 @@ const contentBottom = isCombinedMode
     );
   });
 
-  parts.push(`<g id="chart-content">`);
+  if (!isCombinedMode) parts.push(...titleMarkup);
 
-  // ✅ clip se queda dentro de chart-content (importantísimo para combined)
+  // chart-content
+  parts.push(`<g id="chart-content">`);
+  if (isCombinedMode) parts.push(...titleMarkup);
+
+  // ✅ bounds para combined (incluye título + plot + meses; excluye pills)
+  const monthY = xAxisY + Math.round(monthFs * 1.2);
+  const boundsX = 0;
+  const boundsY = Math.max(0, titleStartY);
+  const boundsW = W;
+  const EXTRA_BOTTOM = Math.round(H * 0.18); // prueba 0.12–0.22
+
+const boundsBottom = Math.min(
+  H,
+  monthY + Math.round(monthFs * 1.6) + EXTRA_BOTTOM
+);
+
+const boundsH = Math.max(1, boundsBottom - boundsY);
+
+
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}"
+      fill="none" opacity="0" />`
+  );
+
+  // defs/clip
   parts.push(`
     <defs>
       <clipPath id="plot-clip">
@@ -480,9 +480,7 @@ const contentBottom = isCombinedMode
 
     pts.forEach((p, i) => {
       const v = cat.values[i];
-
       parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${pointR}" fill="${color}" />`);
-
       parts.push(
         `<text x="${p.x}" y="${p.y - Math.round(pointR * 1.8)}"
           fill="${color}"
@@ -498,7 +496,6 @@ const contentBottom = isCombinedMode
   parts.push(`</g>`);
 
   // Month labels
-  const monthY = xAxisY + Math.round(monthFs * 1.2);
   for (let i = 0; i < monthsCount; i++) {
     const x = xAt(i);
     parts.push(
@@ -513,7 +510,7 @@ const contentBottom = isCombinedMode
     );
   }
 
-  // Pills legend (solo NO combined)
+  // Pills legend (solo NO combined; queda fuera del crop por bounds)
   if (!isCombinedMode) {
     const pillsTop = monthY + Math.round(H * 0.05);
     const pillsMaxH = Math.max(60, H - pillsTop - Math.round(H * 0.05));
@@ -526,7 +523,7 @@ const contentBottom = isCombinedMode
         customColors,
         topY: pillsTop,
         maxH: Math.min(pillsH || pillsMaxH, pillsMaxH),
-        mainText: "#ffffff", // texto dentro del pill
+        mainText: "#ffffff",
       })
     );
   }

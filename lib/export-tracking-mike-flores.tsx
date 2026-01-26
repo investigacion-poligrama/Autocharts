@@ -1,11 +1,11 @@
+// export-tracking-mike-flores.ts
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
 import { ChartConfig } from "@/lib/chartconfig";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-const FONT_FUTURA =
-  "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
+const FONT_FUTURA = "Futura Condensed ExtraBold, Futura, Arial, sans-serif";
 
 const esc = (s: string) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -26,6 +26,7 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
     if (test.length > maxCharsPerLine && cur) {
       lines.push(cur);
       cur = w;
+
       if (lines.length === maxLines - 1) {
         const rest = [cur, ...words.slice(words.indexOf(w) + 1)].join(" ");
         lines.push(rest);
@@ -35,6 +36,7 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
       cur = test;
     }
   }
+
   if (cur) lines.push(cur);
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(" ")];
@@ -43,14 +45,14 @@ function wrapTitle(title: string, maxCharsPerLine: number, maxLines: number): st
 function prepareTitleMike(title: string, W: number, H: number): WrappedTitle {
   const isVertical = H > W;
   const fontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
-  const maxChars = isVertical ? 26 : 40; // un poco más generoso que bar
+  const maxChars = isVertical ? 26 : 34;
   const lines = wrapTitle(title, maxChars, 3);
   const lineGap = Math.round(fontSize * 0.16);
   const blockHeight = lines.length * fontSize + (lines.length - 1) * lineGap;
   return { lines, fontSize, blockHeight };
 }
 
-/* ---------------- A1 helpers (igual que tu tracking poligrama) ---------------- */
+/* ---------------- A1 helpers ---------------- */
 
 function a1ToRowColSummary(a1: string) {
   const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
@@ -86,10 +88,6 @@ function monthToAbbr(raw: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
-  const map: Record<string, string> = {
-    enero: "FEB", // (ojo) no, dejamos correcto abajo
-  };
-
   const m: Record<string, string> = {
     enero: "ENE",
     febrero: "FEB",
@@ -107,7 +105,7 @@ function monthToAbbr(raw: string): string {
   };
 
   const first3 = s.slice(0, 3).toUpperCase();
-  const already = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+  const already = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
   if (already.includes(first3)) return first3;
 
   return m[s] ?? first3;
@@ -125,8 +123,6 @@ function extractTrackingDataSummary(values: any[][], range?: string) {
   }
 
   const { rowStart, rowEnd, colStart, colEnd } = parsed;
-
-  // header en rowStart (como tu función)
   const headerRow = values[rowStart - 1] || [];
 
   const months: string[] = [];
@@ -177,15 +173,11 @@ function pointsToPolylinePath(points: { x: number; y: number }[]) {
   return "M " + points.map((p) => `${p.x} ${p.y}`).join(" L ");
 }
 
-/* ---------------- palette / color picking ----------------
-   Para Mike: usa customColors si existen, si no: colores de ChartConfig o fallback neutral
-*/
+/* ---------------- palette / color picking ---------------- */
 
 function colorForSeries(name: string, customColors: Record<string, string>) {
-  // exact match
   if (customColors?.[name]) return customColors[name];
 
-  // normalized match
   const normalize = (str: string) =>
     str
       .toLowerCase()
@@ -198,7 +190,6 @@ function colorForSeries(name: string, customColors: Record<string, string>) {
   const matchedKey = Object.keys(customColors || {}).find((k) => normalize(k) === n);
   if (matchedKey) return (customColors as any)[matchedKey];
 
-  // try chartconfig tracking palette (si la tienes)
   const matrixColors = (ChartConfig.colors as any).matrixColors;
   const cfg = matrixColors?.tracking?.[n];
   if (cfg) return cfg;
@@ -244,9 +235,7 @@ export function buildTrackingMikeFloresSvg({
       : "#232323";
 
   const mainText =
-    textColor && textColor.trim() && textColor !== "transparent"
-      ? textColor
-      : "#ffffff";
+    textColor && textColor.trim() && textColor !== "transparent" ? textColor : "#ffffff";
 
   const trackingData = extractTrackingDataSummary(sheetValues || [], answerRange);
   if (!trackingData) {
@@ -267,7 +256,7 @@ export function buildTrackingMikeFloresSvg({
     return basicMessageSvg("No hay datos para graficar.", bg, mainText);
   }
 
-  // ---------- layout Mike: título centrado y chart centrado ----------
+  // ---------- Title prep ----------
   const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
     prepareTitleMike(title, W, H);
 
@@ -275,45 +264,30 @@ export function buildTrackingMikeFloresSvg({
   const titleLineGap = Math.round(titleFs * 0.16);
   const titleStartY = titleTop - Math.round(titleBlockH / 2);
 
-  const topPad = Math.round(H * 0.08);
-  const afterTitleGap = Math.round(H * 0.06);
-  const barsAreaTop = topPad + titleBlockH + afterTitleGap;
-  const bottomPad = Math.round(H * 0.12);
+  // ---------- Plot layout (Mike) ----------
+  const axisX = Math.round(W * 0.24);
+  const plotX0 = axisX;
+  const plotX1 = Math.round(W * 0.90);
+  const plotW = plotX1 - plotX0;
 
-
-
-
-  const shouldHideLegend = true;
-
-  // Si quieres leyenda en modo normal, deja un ancho fijo a la izquierda.
-  // En combined (o hideLegend) => 0.
-const marginLeft = Math.round(W * 0.07);
-const marginRight = Math.round(W * 0.07);
-
-const axisX = Math.round(W * 0.24);      // dónde cae el eje Y
-const plotX0 = axisX;
-const plotX1 = Math.round(W * 0.90);     // hasta dónde llega el eje X
-const plotW  = plotX1 - plotX0;
-
-const contentTop = Math.round(H * 0.34);     // baja el chart
-const contentBottom = Math.round(H * 0.71);  // deja aire abajo
-const plotH = Math.max(200, contentBottom - contentTop);
+  // fijo para que se parezca al mock
+  const contentTop = Math.round(H * 0.34);
+  const contentBottom = Math.round(H * 0.71);
+  const plotH = Math.max(200, contentBottom - contentTop);
 
   const monthsCount = months.length;
 
   // y-scale
   const maxValue = Math.max(10, ...categories.flatMap((c) => c.values));
   const yMin = 0;
-let yMax = Math.ceil(maxValue / 5) * 5;
-yMax = Math.max(30, yMax); // mínimo 30
+  let yMax = Math.ceil(maxValue / 5) * 5;
+  yMax = Math.max(30, yMax);
 
-const yAt = (v: number) => {
-  const vv = Math.max(yMin, Math.min(yMax, v)); // 👈 clamp
-  const t = (vv - yMin) / (yMax - yMin);
-  return contentTop + plotH - t * plotH;
-};
-
-
+  const yAt = (v: number) => {
+    const vv = Math.max(yMin, Math.min(yMax, v));
+    const t = (vv - yMin) / (yMax - yMin);
+    return contentTop + plotH - t * plotH;
+  };
 
   // x positions
   const innerMarginX = Math.round(plotW * 0.14);
@@ -324,14 +298,17 @@ const yAt = (v: number) => {
     monthsCount > 1 ? plotX0 + innerMarginX + i * xStep : plotX0 + plotW / 2;
 
   // styles
-  const gridStroke = "#E6E6E6";
-  const gridWidth = 0.25;
-  const gridOpacity = 0.35;
+  const pointR = Math.max(7, Math.round(H * 0.008));
+  const strokeW = Math.max(2, Math.round(H * 0.006));
+  const pctFs = Math.max(18, Math.round(H * 0.017));
+  const monthFs = Math.max(22, Math.round(H * 0.020));
+  const tickFs = Math.max(22, Math.round(H * 0.020));
 
-  const pointR = Math.max(7, Math.round(H * 0.008)); // ~8 en 1080
-  const strokeW = Math.max(2, Math.round(H * 0.006)); // 2–3
-  const pctFs = Math.max(18, Math.round(H * 0.017)); // ~18
-  const monthFs = Math.max(22, Math.round(H * 0.020)); // ~22
+  const axisStroke = mainText;
+  const axisW = 2;
+
+  const xAxisY = contentTop + plotH;
+  const monthY = xAxisY + Math.round(monthFs * 1.2);
 
   // ---------- build svg ----------
   const parts: string[] = [];
@@ -341,10 +318,11 @@ const yAt = (v: number) => {
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
-  // Título (centrado, 3 líneas máx)
+  // ---- Title markup (lo metemos fuera o dentro según combined) ----
+  const titleMarkup: string[] = [];
   titleLines.forEach((line, i) => {
     const y = titleStartY + i * (titleFs + titleLineGap);
-    parts.push(
+    titleMarkup.push(
       `<text x="${Math.round(W / 2)}" y="${y}"
         fill="${mainText}"
         font-family="${FONT_FUTURA}"
@@ -355,86 +333,109 @@ const yAt = (v: number) => {
     );
   });
 
-  // Todo lo que debe ir a combined mode aquí:
+  // ✅ normal: el título va fuera
+  if (!isCombinedMode) parts.push(...titleMarkup);
+
+  // ---- bounds para combined ----
+ const boundsY = Math.max(0, titleStartY);
+
+// izquierda: incluye números del eje Y (tick labels)
+const leftPad = Math.round(W * 0.10);
+const boundsX = Math.max(0, axisX - leftPad);
+
+// derecha: fin del plot + un aire
+const boundsRight = Math.min(W, plotX1 + Math.round(W * 0.03));
+const boundsW = Math.max(1, boundsRight - boundsX);
+
+  // ✅ agrega un padding abajo para que el combined lo escale un poco menos
+const EXTRA_BOTTOM = Math.round(H * 0.18); // prueba 0.12–0.22
+
+const boundsBottom = Math.min(
+  H,
+  monthY + Math.round(monthFs * 1.6) + EXTRA_BOTTOM
+);
+
+const boundsH = Math.max(1, boundsBottom - boundsY);
+
+
+  // ---- chart-content (incluye título en combined) ----
   parts.push(`<g id="chart-content">`);
 
+  if (isCombinedMode) parts.push(...titleMarkup);
+
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}"
+      fill="none" opacity="0" />`
+  );
+
+  // ---- defs FIRST (para que clip-path exista antes de usarse) ----
   parts.push(`
   <defs>
     <clipPath id="plot-clip">
       <rect x="${plotX0}" y="${contentTop}" width="${plotW}" height="${plotH}" />
     </clipPath>
   </defs>
-`);
+  `.trim());
 
-
-  const axisStroke = mainText;
-const axisW = 2;
-
-const xAxisY = contentTop + plotH;
-
-// EJE Y
-parts.push(
-  `<line x1="${axisX}" y1="${contentTop}" x2="${axisX}" y2="${xAxisY}"
-    stroke="${axisStroke}" stroke-width="${axisW}" />`
-);
-
-// EJE X
-parts.push(
-  `<line x1="${axisX}" y1="${xAxisY}" x2="${plotX1}" y2="${xAxisY}"
-    stroke="${axisStroke}" stroke-width="${axisW}" />`
-);
-
-// TICKS Y (5,10,15,20,25,30...)
-const tickFs = Math.max(22, Math.round(H * 0.020));
-for (let t = yMin; t <= yMax; t += 5) {
-  const yy = yAt(t);
+  // EJE Y
   parts.push(
-    `<text x="${axisX - Math.round(W * 0.03)}" y="${yy}"
-      fill="${mainText}"
-      font-family="${FONT_FUTURA}"
-      font-size="${tickFs}"
-      font-weight="400"
-      text-anchor="end"
-      dominant-baseline="middle">${t}</text>`
+    `<line x1="${axisX}" y1="${contentTop}" x2="${axisX}" y2="${xAxisY}"
+      stroke="${axisStroke}" stroke-width="${axisW}" />`
   );
-}
 
-  // SERIES
-  parts.push(`<g clip-path="url(#plot-clip)">`);
+  // EJE X
+  parts.push(
+    `<line x1="${axisX}" y1="${xAxisY}" x2="${plotX1}" y2="${xAxisY}"
+      stroke="${axisStroke}" stroke-width="${axisW}" />`
+  );
 
-categories.forEach((cat) => {
-  const color = colorForSeries(cat.name, customColors);
-  const pts = cat.values.map((v, i) => ({ x: xAt(i), y: yAt(v) }));
-
-  if (pts.length > 1) {
-    const d = pointsToPolylinePath(pts);
+  // TICKS Y (0..yMax cada 5)
+  for (let t = yMin; t <= yMax; t += 5) {
+    const yy = yAt(t);
     parts.push(
-      `<path d="${d}" stroke="${color}" stroke-width="${strokeW}" fill="none"
-        stroke-linecap="round" stroke-linejoin="round" />`
+      `<text x="${axisX - Math.round(W * 0.03)}" y="${yy}"
+        fill="${mainText}"
+        font-family="${FONT_FUTURA}"
+        font-size="${tickFs}"
+        font-weight="400"
+        text-anchor="end"
+        dominant-baseline="middle">${t}</text>`
     );
   }
 
-  pts.forEach((p, i) => {
-    const v = cat.values[i];
-    parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${pointR}" fill="${color}" />`);
-    parts.push(
-      `<text x="${p.x}" y="${p.y - Math.round(pointR * 1.8)}"
-        fill="${color}"
-        font-family="${FONT_FUTURA}"
-        font-size="${pctFs}"
-        font-weight="800"
-        text-anchor="middle"
-        dominant-baseline="alphabetic">${esc(v.toFixed(0))}%</text>`
-    );
+  // SERIES (clip)
+  parts.push(`<g clip-path="url(#plot-clip)">`);
+
+  categories.forEach((cat) => {
+    const color = colorForSeries(cat.name, customColors);
+    const pts = cat.values.map((v, i) => ({ x: xAt(i), y: yAt(v) }));
+
+    if (pts.length > 1) {
+      const d = pointsToPolylinePath(pts);
+      parts.push(
+        `<path d="${d}" stroke="${color}" stroke-width="${strokeW}" fill="none"
+          stroke-linecap="round" stroke-linejoin="round" />`
+      );
+    }
+
+    pts.forEach((p, i) => {
+      const v = cat.values[i];
+      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${pointR}" fill="${color}" />`);
+      parts.push(
+        `<text x="${p.x}" y="${p.y - Math.round(pointR * 1.8)}"
+          fill="${color}"
+          font-family="${FONT_FUTURA}"
+          font-size="${pctFs}"
+          font-weight="800"
+          text-anchor="middle"
+          dominant-baseline="alphabetic">${esc(v.toFixed(0))}%</text>`
+      );
+    });
   });
-});
 
-parts.push(`</g>`);
+  parts.push(`</g>`);
 
-
-
-  // MONTH LABELS
-  const monthY = xAxisY + Math.round(monthFs * 1.2);
+  // Meses
   for (let i = 0; i < monthsCount; i++) {
     const x = xAt(i);
     parts.push(
