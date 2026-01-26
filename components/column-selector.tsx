@@ -663,7 +663,7 @@ export function ColumnSelector({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <input
             type="color"
-            value={customColors[freq.label] || "#00a651"}
+            value={customColors[freq.label] || "#01793B"}
             onChange={(e) => onColorChange(freq.label, e.target.value)}
             onClick={(e) => e.stopPropagation()}
             className="w-8 h-8 rounded cursor-pointer border border-border flex-shrink-0"
