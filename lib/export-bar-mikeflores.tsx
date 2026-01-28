@@ -116,11 +116,11 @@ export function MikebuildBarSvg({
   // ---- Layout (calibrado para verse como la foto) ----
   const isVertical = H > W;
 
-  const titleFontSize = Math.round(isVertical ? W * 0.04 : H * 0.060);
+  const titleFontSize = Math.round(isVertical ? W * 0.035 : H * 0.050);
   const titleTop = Math.round(H * 0.17);
 
   // Bloque central de barras
-  const blockWidth = Math.round(W * 0.52);
+  const blockWidth = Math.round(W * 0.7);
   const barX0 = Math.round((W - blockWidth) / 2);
 
   const pctGap = Math.round(W * 0.02);
@@ -139,7 +139,7 @@ export function MikebuildBarSvg({
   const labelRatio = 0.55;
   const labelGapRatio = 0.20;
 
-  const maxTitleChars = isVertical ? 26 : 34;
+  const maxTitleChars = isVertical ? 30 : 42;
   const titleLines = wrapTitle(title, maxTitleChars, 3);
   const titleLineGap = Math.round(titleFontSize * 0.16);
 
@@ -151,7 +151,7 @@ export function MikebuildBarSvg({
 
   // Margen superior + “aire” debajo del título
   const topPad = Math.round(H * 0.08);
-  const afterTitleGap = Math.round(H * 0.05);
+  const afterTitleGap = Math.round(H * 0.085);
 
   const denomPerRow = labelRatio + labelGapRatio + 1;
   const denomTotal = rows * denomPerRow + (rows - 1) * gapRatio;
@@ -161,7 +161,7 @@ export function MikebuildBarSvg({
   const barsAreaH = Math.max(200, H - barsAreaTop - bottomPad);
 
   let barH = Math.floor(barsAreaH / denomTotal);
-  barH = Math.max(18, Math.min(barH, Math.round(H * 0.055)));
+  barH = Math.max(18, Math.min(barH, Math.round(H * 0.04)));
 
   const rowGap = Math.round(barH * gapRatio);
   const labelFont = Math.round(barH * labelRatio);
