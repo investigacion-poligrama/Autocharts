@@ -206,12 +206,16 @@ for (let r = rowStart; r <= rowEnd; r++) {
 
   col2Labels.forEach((colLabel, idx) => {
     const cellRaw = row[colStart - 1 + idx];
-    matrix[rowLabel][colLabel] = Math.round(parsePercentToNumber(cellRaw));
+    matrix[rowLabel][colLabel] = Number(parsePercentToNumber(cellRaw).toFixed(1));
   });
 }
-
-const finalRowOrder =
-  matrixRowOrder?.length ? matrixRowOrder : rowOrder;
+const fmtPct = (n: number) => {
+  const v = Number.isFinite(n) ? n : 0;
+  const s = v.toFixed(1);
+  return s.endsWith(".0") ? s.slice(0, -2) : s;
+};
+const safeRowOrder = (matrixRowOrder?.length ? matrixRowOrder : rowOrder)
+  .filter((lbl) => matrix[lbl]);
 
   if (!rowOrder.length || !col2Labels.length) {
     return basicMsg("No se pudo leer la matriz desde el rango.");
@@ -253,7 +257,8 @@ parts.push(`<g id="chart-content">`);
 
   const headerH = 70;
   const rowsH = tableHeight - headerH;
-  const rowH = rowsH / finalRowOrder.length;
+  const rowH = rowsH / safeRowOrder.length;
+
   const labelColW = 280;
   const dataW = W - marginLeft - marginRight - labelColW;
   const shrinkX = 0.78;
@@ -293,7 +298,7 @@ const pillX = blockLeft + idx * (PILL_W + PILL_GAP);
   </text>`);
   });
 
-  finalRowOrder.forEach((rowLabel, rowIndex) => {
+  safeRowOrder.forEach((rowLabel, rowIndex) => {
     const y = tableTop + headerH + rowIndex * rowH;
 
     const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
@@ -333,7 +338,7 @@ parts.push(
     }
 
     col2Labels.forEach((colLabel, colIndex) => {
-      const pct = matrix[rowLabel][colLabel] ?? 0;
+      const pct = matrix[rowLabel]?.[colLabel] ?? 0;
       const cellPillX = blockLeft + colIndex * (PILL_W + PILL_GAP);
 
       const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
@@ -346,7 +351,7 @@ parts.push(
     fill="${mainTextColor}" font-size="20" font-weight="700"
     text-anchor="middle" dominant-baseline="middle"
     font-family="${FONT_STACK}">
-    ${pct}%
+    ${fmtPct(pct)}%
   </text>`
 );
     });
