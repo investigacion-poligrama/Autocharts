@@ -256,22 +256,41 @@ parts.push(`<g id="chart-content">`);
   const rowH = rowsH / finalRowOrder.length;
   const labelColW = 280;
   const dataW = W - marginLeft - marginRight - labelColW;
-  const colW = dataW / col2Labels.length;
+  const shrinkX = 0.78;
+  const PILL_W = (labelColW - 16) * shrinkX; 
+  const PILL_GAP = 20; // prueba 12–32
+  const cols = col2Labels.length;
+
+// ancho total del grupo de % (header/columnas)
+const colsBlockW = cols * PILL_W + (cols - 1) * PILL_GAP;
+
+// ancho total de TODA la matriz (label + gap + columnas)
+const fullBlockW = PILL_W + PILL_GAP + colsBlockW;
+
+// centrado en el canvas (entre margins)
+const contentLeft = marginLeft;
+const contentW = W - marginLeft - marginRight;
+const fullLeft = contentLeft + (contentW - fullBlockW) / 2;
+
+// posiciones X finales
+const labelPillX = fullLeft;
+const blockLeft = labelPillX + PILL_W + PILL_GAP;
+
+
 
   col2Labels.forEach((label, idx) => {
-    const x = marginLeft + labelColW + idx * colW;
     const rectY = tableTop + 10;
     const rectH = headerH - 20;
+const pillX = blockLeft + idx * (PILL_W + PILL_GAP);
 
     parts.push(
-      `<rect x="${x + 4}" y="${rectY}" width="${colW - 8}" height="${rectH}"
-        rx="12" fill="#ffffff"/>`,
-      `<text x="${x + colW / 2}" y="${rectY + rectH / 2}" fill="#000000"
-        font-size="20" font-weight="700" text-anchor="middle"
-        dominant-baseline="middle" font-family="${FONT_STACK}">
-        ${esc(label)}
-      </text>`
-    );
+  `<rect x="${pillX}" y="${rectY}" width="${PILL_W}" height="${rectH}"
+    rx="12" fill="none"/>`,
+  `<text x="${pillX + PILL_W / 2}" y="${rectY + rectH / 2}" fill="${mainTextColor}"
+    font-size="20" font-weight="700" text-anchor="middle"
+    dominant-baseline="middle" font-family="${FONT_STACK}">
+    ${esc(label)}
+  </text>`);
   });
 
   finalRowOrder.forEach((rowLabel, rowIndex) => {
@@ -279,13 +298,17 @@ parts.push(`<g id="chart-content">`);
 
     const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
     const textLines = wrapMatrixLabel(rowLabel);
+const labelW = PILL_W;
+const labelX = labelPillX; // <- clave
 
-    parts.push(
-      `<rect x="${marginLeft}" y="${y + 6}" width="${labelColW - 16}"
-        height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
-    );
 
-    const centerX = marginLeft + (labelColW - 16) / 2;
+parts.push(
+  `<rect x="${labelX}" y="${y + 6}" width="${labelW}"
+    height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
+);
+
+
+    const centerX = labelX + labelW / 2;
     const centerY = y + rowH / 2;
 
     if (textLines.length === 1) {
@@ -310,21 +333,22 @@ parts.push(`<g id="chart-content">`);
     }
 
     col2Labels.forEach((colLabel, colIndex) => {
-      const cellX = marginLeft + labelColW + colIndex * colW;
       const pct = matrix[rowLabel][colLabel] ?? 0;
+      const cellPillX = blockLeft + colIndex * (PILL_W + PILL_GAP);
 
       const { baseHex, alpha } = cellFill(rowLabel, pct, customColors);
 
-      parts.push(
-        `<rect x="${cellX + 4}" y="${y + 6}" width="${colW - 8}" height="${rowH - 12}"
-          rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
-        `<text x="${cellX + colW / 2}" y="${y + rowH / 2}"
-          fill="${mainTextColor}" font-size="20" font-weight="700"
-          text-anchor="middle" dominant-baseline="middle"
-          font-family="${FONT_STACK}">
-          ${pct}%
-        </text>`
-      );
+      
+parts.push(
+  `<rect x="${cellPillX}" y="${y + 6}" width="${PILL_W}" height="${rowH - 12}"
+    rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
+  `<text x="${cellPillX + PILL_W / 2}" y="${y + rowH / 2}"
+    fill="${mainTextColor}" font-size="20" font-weight="700"
+    text-anchor="middle" dominant-baseline="middle"
+    font-family="${FONT_STACK}">
+    ${pct}%
+  </text>`
+);
     });
   });
 parts.push(`</g>`);
