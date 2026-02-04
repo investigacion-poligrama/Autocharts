@@ -132,8 +132,9 @@ export function buildNarrowVertBarsSvg({
    const isCensBrand = brand === "censEdmundSinsa";
 
   const theme = getBrandTheme(brand ?? "poligrama");
-  const W = isCensBrand ? 612 : (width ?? 1920);
-const H = isCensBrand ? 792 : (height ?? 1080);
+const FORCE_CENS = isCensBrand && !isCombinedMode; // 👈 clave
+const W = FORCE_CENS ? 612 : (width ?? 1920);
+const H = FORCE_CENS ? 792 : (height ?? 1080);
 
 
   // Para Cens usamos reglas “tall” escaladas desde 1440x1800
@@ -149,6 +150,7 @@ const H = isCensBrand ? 792 : (height ?? 1080);
   const mainTextColor = textColor ?? theme.defaultTextColor;
 
   const useTallRules = isCensBrand || (W === 1440 && H === 1800);
+  
 
   const marginLeft = useTallRules ? S(100) : 120;
   const marginRight = useTallRules ? S(100) : 120;
@@ -198,12 +200,14 @@ const H = isCensBrand ? 792 : (height ?? 1080);
     ].join("\n");
   }
 
-  // ---- Área de barras (vertical) ----
-  // Diseño “tipo foto”: mucho aire arriba y barras “desde el baseline”
-const barsTop = marginTop + S(20)
+const headerBottom = titleY + titleBlockH + S(30);
+
+// en combined: el plot NO debe reservar aire para el título,
+// porque el header/título se coloca en otro slot
+const barsTop = isCombinedMode ? (headerBottom + S(10)) : (marginTop + S(20));
 
 
-// ✅ reserva REAL para labels (máx 2 líneas) + padding
+
 const labelGap = S(28);
 const labelFs = useTallRules ? S(24) : 24;
 const maxLabelLines = 2;
@@ -211,16 +215,25 @@ const labelLineGap = S(6);
 const labelsBlockH =
   labelGap + (maxLabelLines * labelFs) + ((maxLabelLines - 1) * labelLineGap) + S(24);
 
-// ✅ ya no uses S(400)
-const barsBottom = H - marginBottom - labelsBlockH;
+// ✅ 1) “techo” máximo permitido para que labels quepan
+const maxBaselineY = H - marginBottom - labelsBlockH;
+
+// ✅ 2) baseline deseado (más arriba) — ajusta el 0.58 a tu gusto
+// 0.50 = a la mitad, 0.65 = más abajo, 0.58 suele verse como tu ejemplo
+const baselineShare =
+  isCombinedMode ? 0.62 : (isCensBrand ? 0.7 : 0.75);
+
+const desiredBaselineY = barsTop + (maxBaselineY - barsTop) * baselineShare;
+
+// ✅ 3) clamp final
+const baselineY = Math.min(maxBaselineY, Math.max(barsTop + S(80), desiredBaselineY));
+
+// ✅ 4) altura real de barras
+const barsBottom = baselineY;
 const barsH = Math.max(1, barsBottom - barsTop);
 
-
-  // Baseline (donde “nacen” las barras)
-  const baselineY = barsBottom;
-
   // Ancho util
-  const plotLeft = marginLeft + S(20);
+  const plotLeft = marginLeft + (isCombinedMode ? S(0) : S(20));
   const plotRight = W - marginRight - S(20);
   const plotW = Math.max(1, plotRight - plotLeft);
 
@@ -254,6 +267,7 @@ const barsH = Math.max(1, barsBottom - barsTop);
   );
 
 parts.push(`<g id="chart-content">`);
+parts.push(`<g id="chart-header">`);
   // HEADER
   if (sheetTitle) {
     parts.push(
@@ -288,6 +302,13 @@ parts.push(`<g id="chart-content">`);
              text-anchor="start">${esc(line)}</text>`
     );
   });
+
+parts.push(
+  `<rect id="header-bounds" x="0" y="0" width="${W}" height="${headerBottom}" fill="none" opacity="0" />`
+);
+
+  parts.push(`</g>`);
+  parts.push(`<g id="chart-plot">`);
   
   // BARS
   // Opacidades tipo “tonos” sin colores nuevos
@@ -340,20 +361,21 @@ parts.push(`<g id="chart-content">`);
 
  // ✅ bounds "tight" para combined (corta el margen izquierdo/derecho)
 const contentBottom = Math.min(H, barsBottom + labelsBlockH);
+const PAD = isCombinedMode ? S(0) : S(20);
 
-// el dibujo real vive entre plotLeft..plotRight (con un poquito de aire)
-const boundsX = Math.max(0, plotLeft - S(20));
-const boundsRight = Math.min(W, plotRight + S(20));
+const boundsX = Math.max(0, plotLeft - PAD);
+const boundsRight = Math.min(W, plotRight + PAD);
 const boundsW = Math.max(1, boundsRight - boundsX);
 
-// si estás ocultando header/título, el contenido empieza más abajo
-const boundsY =  Math.max(0, barsTop - S(20)) 
+const PAD_TOP = isCombinedMode ? S(0) : S(20);
+const boundsY = Math.max(0, barsTop - PAD_TOP);
 
-const boundsBottom = Math.min(H, contentBottom);
+const boundsBottom = Math.min(H, contentBottom + PAD_TOP);
 const boundsH = Math.max(1, boundsBottom - boundsY);
 
 parts.push(
   `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}" fill="none" opacity="0" />`,
+  `</g>`,
   `</g>`,
   `</svg>`
 );

@@ -147,6 +147,56 @@ function getFallbackBoundsFromSvg(svg: string): SvgBounds | null {
  * y opcionalmente el rect id="content-bounds".
  * Si no existe <g id="chart-content">, hace fallback a “inner sin wrapper”.
  */
+
+function extractGroup(svg: string, groupId: string): string {
+  const reStart = new RegExp(`<g[^>]*id="${groupId}"[^>]*>`, "i");
+  const gStart = svg.search(reStart);
+  if (gStart === -1) return "";
+
+  const openTagMatch = svg.slice(gStart).match(reStart);
+  if (!openTagMatch) return "";
+
+  const openTag = openTagMatch[0];
+  const contentStart = gStart + openTag.length;
+
+  let depth = 1;
+  const re = /<\/?g\b[^>]*>/gi;
+  re.lastIndex = contentStart;
+
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(svg))) {
+    const tag = match[0];
+    if (tag.startsWith("</")) depth--;
+    else depth++;
+
+    if (depth === 0) {
+      const contentEnd = match.index;
+      return svg.slice(contentStart, contentEnd);
+    }
+  }
+  return "";
+}
+
+function extractRectBoundsFromFragment(fragment: string, rectId: string): SvgBounds | null {
+  const re = new RegExp(`<rect[^>]*id="${rectId}"[^>]*>`, "i");
+  const m = fragment.match(re);
+  if (!m) return null;
+
+  const rect = m[0];
+  const getNum = (attr: string) => {
+    const mm = rect.match(new RegExp(`${attr}="([^"]+)"`, "i"));
+    return mm ? Number(mm[1]) : NaN;
+  };
+
+  const x = getNum("x");
+  const y = getNum("y");
+  const w = getNum("width");
+  const h = getNum("height");
+
+  if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) return null;
+  return { x, y, w, h };
+}
+
 function extractChartContent(svg: string, wantBounds: boolean): ExtractedSvg {
   const gStart = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
 
@@ -758,119 +808,122 @@ function buildCombined(args: ChartSvgArgs) {
   const isCens = brand === "censEdmundSinsa";
 
 if (isCens) {
+  // ------------------------------------------------------------------
+  // CENS Combined: A (header+title) + B (narrow plot) + C (stacked plot)
+  // ------------------------------------------------------------------
 
-// dentro de buildCombined(args) -> if (isCens) { ... }
+  // ✅ B) Fuerza el orden: narrow arriba, stacked abajo
+  const topChart =
+    a.chartType === "narrowvertbars"
+      ? a
+      : b.chartType === "narrowvertbars"
+      ? b
+      : a; // fallback
 
-// ✅ B) Fuerza el orden: narrow arriba, stacked abajo
-const topChart =
-  a.chartType === "narrowvertbars" ? a :
-  b.chartType === "narrowvertbars" ? b :
-  a; // fallback
+  const bottomChart = topChart === a ? b : a;
 
-const bottomChart =
-  topChart === a ? b : a;
+  const outBg = args.backgroundColor ?? "#ffffff";
+  const outW = 612;
+  const outH = 792;
 
-// (opcional pero recomendado) si quieres ser estricto:
-/// if (topChart.chartType !== "narrowvertbars" || bottomChart.chartType !== "stackedvertical") {
-///   console.warn("CENS combined esperaba narrowvertbars arriba y stackedvertical abajo");
-/// }
+  // Render “base” para extraer header/plot con bounds buenos (tall rules)
+  const BASE_W = 1440;
+  const BASE_H = 1800;
 
-const outBg = args.backgroundColor ?? "#ffffff";
-const outW = 612;
-const outH = 792;
+  const svgTop = chartSvgBuilders[topChart.chartType]({
+    ...topChart.args,
+    width: BASE_W,
+    height: BASE_H,
+    isCombinedMode: true,
+  });
 
-const BASE_W = 1440;
-const BASE_H = 1800;
+  const svgBottom = chartSvgBuilders[bottomChart.chartType]({
+    ...bottomChart.args,
+    width: BASE_W,
+    height: BASE_H,
+    isCombinedMode: true,
+  });
 
-// ✅ usa topChart / bottomChart en lugar de a / b
-const svgTop = chartSvgBuilders[topChart.chartType]({
-  ...topChart.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true, // (recomendado, para que no achique)
+  // -----------------------------
+  // A) Header + título (sin escala)
+  // -----------------------------
+const headerInnerRaw = extractGroup(svgTop, "chart-header");
+const headerInner = namespaceSvgIds(headerInnerRaw, "h-");
+const headerB = extractRectBoundsFromFragment(headerInnerRaw, "header-bounds")
+  ?? { x: 0, y: 0, w: BASE_W, h: 380 }; // fallback
+
+  // -----------------------------
+  // B) Plot narrow (solo chart-plot)
+  // -----------------------------
+const topPlotInnerRaw = extractGroup(svgTop, "chart-plot");
+const topPlotInner = namespaceSvgIds(topPlotInnerRaw, "b-");
+const topPlotB =
+  extractRectBoundsFromFragment(topPlotInnerRaw, "content-bounds") ??
+  extractInnerSvgWithBounds(svgTop).bounds;
+
+  // -----------------------------
+  // C) Plot stacked (solo chart-plot)
+  // -----------------------------
+const bottomPlotInnerRaw = extractGroup(svgBottom, "chart-plot");
+const bottomPlotInner = namespaceSvgIds(bottomPlotInnerRaw, "c-");
+const bottomPlotB =
+  extractRectBoundsFromFragment(bottomPlotInnerRaw, "content-bounds") ??
+  extractInnerSvgWithBounds(svgBottom).bounds;
+
+
+
+  // -----------------------------
+  // Layout: A fijo, B/C se reparten el resto del alto
+  // -----------------------------
+ const TOP_PAD = 0;
+const GAP = Math.round(outH * 0.015); 
+
+  // Header H: usa bounds reales; fallback 260
+const headerSlotH = Math.round(outH * 0.30); // 30% suele verse como tu “foto buena”
+
+const availableH = outH - TOP_PAD - headerSlotH - GAP;
+const topShare = 0.44; // 👈 fijo (más estable que usar bounds.h)
+const topH = Math.round(availableH * topShare);
+const bottomH = availableH - topH;
+
+  // Place header (ESCALADO)
+const placedHeader = placeIntoSlot(headerInner, headerB, outW, headerSlotH, {
+  allowUpscale: false,
+  margin: 1,
+  alignY: "top",
+  alignX: "left",
 });
 
-const svgBottom = chartSvgBuilders[bottomChart.chartType]({
-  ...bottomChart.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true,
-});
-
-
-  const top = extractInnerSvgWithBounds(svgTop);
-  const bottom = extractInnerSvgWithBounds(svgBottom);
-
-  const topB = top.bounds ?? { x: 0, y: 0, w: outW, h: outH };
-  const bottomB = bottom.bounds ?? { x: 0, y: 0, w: outW, h: outH };
-
-  const topInner = namespaceSvgIds(top.inner, "c1-");
-  const bottomInner = namespaceSvgIds(bottom.inner, "c2-");
-
-  const TOP_PAD = Math.round(outH * 0.01);
-  const GAP = Math.round(outH * 0.015);
-  const availableH = outH - TOP_PAD - GAP;
-
-  // reparto por content-bounds, con clamps
-  const rawShare = topB.h / Math.max(1, topB.h + bottomB.h);
-  const topShare = Math.min(0.62, Math.max(0.38, rawShare));
-  const topH = Math.max(1, Math.round(availableH * topShare));
-  const bottomH = Math.max(1, availableH - topH);
-
-  // ✅ common scale (igual que Deskover)
-  // ✅ Opción A: escala independiente (evita que el peor "encoga" a los dos)
-const scaleTop = Math.min(outW / topB.w);
-const scaleBottom = Math.min(outW / bottomB.w);
-
-const placedTop = placeIntoSlot(topInner, topB, outW, topH, {
-  forceScale: scaleTop,
+// Place plots (ESCALADOS)
+const placedTop = placeIntoSlot(topPlotInner, topPlotB, outW, topH, {
+  allowUpscale: true,
+  maxScale: 2.2,
   margin: 1,
   alignY: "top",
   alignX: "center",
-  allowUpscale: true,
-  maxScale: 1.5,
 });
 
-const placedBottom = placeIntoSlot(bottomInner, bottomB, outW, bottomH, {
-  forceScale: scaleBottom,
+const placedBottom = placeIntoSlot(bottomPlotInner, bottomPlotB, outW, bottomH, {
+  allowUpscale: true,
+  maxScale: 2.2,
   margin: 1,
   alignY: "top",
   alignX: "center",
-  allowUpscale: true,
-  maxScale: 1.5,
 });
 
-  const clipTopId = "clip-top";
-  const clipBottomId = "clip-bottom";
+  // Si NO quieres recortes, NO uses clipPaths aquí.
+  // (Con bounds bien calculados, no debería haber overflow)
 
-  return `
-<?xml version="1.0" encoding="UTF-8"?>
+
+return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${outW} ${outH}">
   <rect width="100%" height="100%" fill="${outBg}"/>
-
-  <defs>
-    <clipPath id="${clipTopId}">
-      <rect x="0" y="0" width="${outW}" height="${topH}" />
-    </clipPath>
-    <clipPath id="${clipBottomId}">
-      <rect x="0" y="0" width="${outW}" height="${bottomH}" />
-    </clipPath>
-  </defs>
-
-  <g transform="translate(0,${TOP_PAD})" clip-path="url(#${clipTopId})">
-    ${placedTop}
-  </g>
-
-  <g transform="translate(0,${TOP_PAD + topH + GAP})" clip-path="url(#${clipBottomId})">
-    ${placedBottom}
-  </g>
+  <g transform="translate(0,${TOP_PAD})">${placedHeader}</g>
+  <g transform="translate(0,${TOP_PAD + headerSlotH})">${placedTop}</g>
+  <g transform="translate(0,${TOP_PAD + headerSlotH + topH + GAP})">${placedBottom}</g>
 </svg>
 `.trim();
 }
-
-
-
-  
   if (deskover) {
     const BASE_W = 1920;
     const BASE_H = 1080;

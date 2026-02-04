@@ -269,8 +269,10 @@ export function buildStackedVerticalSvg({
   const isCensBrand = brand === "censEdmundSinsa";
 
   // No tocar Poligrama/Desk. Solo Cens se fuerza a 612x792.
-const W = isCensBrand ? 612 : (width ?? 1920);
-const H = isCensBrand ? 792 : (height ?? 1080);
+const FORCE_CENS = isCensBrand && !isCombinedMode; // 👈 clave
+const W = FORCE_CENS ? 612 : (width ?? 1920);
+const H = FORCE_CENS ? 792 : (height ?? 1080);
+
   const hideHeaderAndTitle = Boolean(isCombinedMode && isCensBrand);
 
 
@@ -337,10 +339,11 @@ const H = isCensBrand ? 792 : (height ?? 1080);
   let lineY: number;
 
 if (isCensBrand) {
-  if (hideHeaderAndTitle) {
-    lineY = marginTop + S(20);
+   trackingLabelFs = S(60);
+   if (hideHeaderAndTitle) {
+    trackingLabelY = marginTop + S(60);
+    lineY = trackingLabelY + S(40);
   } else {
-    trackingLabelFs = S(60);
     trackingLabelY = titleY + titleBlockH + S(60);
     lineY = trackingLabelY + S(40);
   }
@@ -381,8 +384,18 @@ if (isCensBrand) {
 
   const axisLeft = marginLeft + S(40);
   const barsLeft = axisLeft + S(40);
-  const barsRight = W - marginRight;
-  const barsWidth = barsRight - barsLeft;
+  const showRightLegend = Boolean(isCensBrand && isCombinedMode);
+
+// ancho reservado para leyenda (ajústalo)
+const legendW = showRightLegend ? S(260) : 0;
+const legendGapX = showRightLegend ? S(24) : 0;
+
+const barsRight = showRightLegend
+  ? (W - marginRight - legendW - legendGapX)
+  : (W - marginRight);
+
+const barsWidth = barsRight - barsLeft;
+
 
   const chartTop = lineY + S(50);
 
@@ -426,7 +439,8 @@ parts.push(
   `<?xml version="1.0" encoding="UTF-8"?>`,
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
   `<rect width="100%" height="100%" fill="${bg}" />`,
-  `<g id="chart-content">`
+  `<g id="chart-content">`,
+  `<g id="chart-header">`
 );
 
 
@@ -477,18 +491,19 @@ if (!hideHeaderAndTitle && sheetTitle) {
     );
   });
 }
+parts.push(`</g>`);
+parts.push(`<g id="chart-plot">`);
 
 
-  if (!hideHeaderAndTitle && isCensBrand) {
+  if (isCensBrand) {
   parts.push(
     `<text x="${marginLeft}" y="${trackingLabelY}"
-           fill="${mainTextColor}"
-           font-family="${FONT_STACK}"
-           font-size="${trackingLabelFs}"
-           font-weight="700"
-           text-anchor="start">Tracking</text>`
+      fill="${mainTextColor}" font-family="${FONT_STACK}"
+      font-size="${trackingLabelFs}" font-weight="700"
+      text-anchor="start">Tracking</text>`
   );
 }
+
 
 
   parts.push(
@@ -604,9 +619,33 @@ yTicks.forEach((v) => {
         `</text>`
     );
   });
+const legendItemHeight = S(24);
+const legendFontSize = isCensBrand ? S(34) : 20;
 
-  const legendItemHeight = S(24);
-  const legendFontSize = isCensBrand ? S(34) : 20;
+if (showRightLegend) {
+  // ✅ Leyenda a la derecha, vertical
+  const legendX = barsRight + legendGapX;
+  const legendY = chartTop;
+  const legendFontSizeR = S(28);
+  const squareSizeR = S(18);
+  const rowGapR = S(14);
+
+  categories.forEach((cat, idx) => {
+    const y = legendY + idx * (squareSizeR + rowGapR);
+    const color = colorForProblem(cat.name, customColors);
+
+    parts.push(
+      `<rect x="${legendX}" y="${y}" width="${squareSizeR}" height="${squareSizeR}" fill="${color}" />`,
+      `<text x="${legendX + squareSizeR + S(10)}" y="${y + squareSizeR - S(2)}"
+             fill="${mainTextColor}"
+             font-family="${FONT_STACK}"
+             font-size="${legendFontSizeR}"
+             text-anchor="start">${esc(String(cat.name || ""))}</text>`
+    );
+  });
+
+} else {
+  // ✅ Leyenda abajo (tu layout actual)
 
   const colLabelMaxLens = new Array(legendCols).fill(0);
   categories.forEach((cat, idx) => {
@@ -618,6 +657,7 @@ yTicks.forEach((v) => {
   const approxCharW = isCensBrand ? 6 : 10;
   const colTextWidths = colLabelMaxLens.map((len) => len * approxCharW);
   const colWidths = colTextWidths.map((textW) => squareSize + S(8) + textW + S(18));
+
   const legendAreaLeft = barsLeft;
   const legendAreaRight = barsRight;
   const legendAreaWidth = legendAreaRight - legendAreaLeft;
@@ -630,6 +670,7 @@ yTicks.forEach((v) => {
     colOffsets[idx] = acc;
     return acc + w;
   }, 0);
+
   categories.forEach((cat, idx) => {
     const colIdx = idx % legendCols;
     const rowIdx = Math.floor(idx / legendCols);
@@ -653,6 +694,7 @@ yTicks.forEach((v) => {
              text-anchor="start">${esc(String(cat.name || ""))}</text>`
     );
   });
+}
 
   // ✅ calcula hasta dónde llega la leyenda
 
@@ -664,14 +706,18 @@ const contentBottom = Math.min(H, legendTop + legendBlockH);
 
 // incluir labels del eje Y (van a la izquierda de barsLeft)
 const yAxisLabelPad = S(90);      // ajusta si quieres (80–110 suele bien)
-const rightPad = S(30);
 
 const boundsX = Math.max(0, barsLeft - yAxisLabelPad);
-const boundsRight = Math.min(W, barsRight + rightPad);
+const rightPad = S(30);
+
+const boundsRight = showRightLegend
+  ? Math.min(W, (barsRight + legendGapX + legendW + rightPad))
+  : Math.min(W, (barsRight + rightPad));
+
 const boundsW = Math.max(1, boundsRight - boundsX);
 
 // si ocultas header/título en combined, tu contenido real empieza en chartTop
-const boundsY = hideHeaderAndTitle ? Math.max(0, chartTop - S(20)) : 0;
+const boundsY = Math.max(0, Math.min(chartTop - S(20), trackingLabelY - S(20)));
 
 // bottom real
 const boundsBottom = Math.min(H, contentBottom);
@@ -680,11 +726,11 @@ parts.push(
   `<rect id="content-bounds"
         x="${boundsX}" y="${boundsY}"
         width="${boundsW}" height="${boundsH}"
-        fill="none" opacity="0" />`,
-  `</g>`,
-  `</svg>`
+        fill="none" opacity="0" />`
 );
-
+parts.push(`</g>`); // cierra chart-plot
+parts.push(`</g>`); // cierra chart-content
+parts.push(`</svg>`);
 
 
 return parts.join("\n");
