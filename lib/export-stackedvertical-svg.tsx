@@ -263,15 +263,17 @@ export function buildStackedVerticalSvg({
   backgroundColor,
   textColor,
   brand,
+  isCombinedMode,
 }: ChartSvgArgs): string {
   const theme = getBrandTheme(brand ?? "poligrama");
   const isCensBrand = brand === "censEdmundSinsa";
 
   // No tocar Poligrama/Desk. Solo Cens se fuerza a 612x792.
-  const W = isCensBrand ? CENS_W : width ?? CANVAS_W;
-  const H = isCensBrand ? CENS_H : height ?? CANVAS_H;
+const W = isCensBrand ? 612 : (width ?? 1920);
+const H = isCensBrand ? 792 : (height ?? 1080);
+  const hideHeaderAndTitle = Boolean(isCombinedMode && isCensBrand);
 
-  const wantsCoolvetica = /coolvetica rg/i.test(theme.fontFamily || "");
+
   const FONT_STACK = theme.fontFamily || "Helvetica, Arial, sans-serif";
 
   const bg = backgroundColor ?? theme.defaultBackground;
@@ -323,26 +325,28 @@ export function buildStackedVerticalSvg({
   const headerDateLabel = `${monthLabel} ${now.getFullYear()}`;
 
   const titleY = marginTop + S(130);
+  
 
   const baseTitleFs = isCensBrand ? S(75) : ChartConfig.typography.title.fontSize;
   const maxTitleChars = isTall1440 ? 43 : 80;
-  const maxTitleCharsUsed = isCensBrand ? 43 : maxTitleChars;
 
  const { lines: titleLines, fontSize: titleFs, blockHeight: titleBlockH } =
   prepareTitle(title, baseTitleFs, 30, 3);
-
-
   let trackingLabelY = 0;
   let trackingLabelFs = 0;
   let lineY: number;
 
-  if (isCensBrand) {
+if (isCensBrand) {
+  if (hideHeaderAndTitle) {
+    lineY = marginTop + S(20);
+  } else {
     trackingLabelFs = S(60);
     trackingLabelY = titleY + titleBlockH + S(60);
     lineY = trackingLabelY + S(40);
-  } else {
-    lineY = titleY + titleBlockH + 16;
   }
+} else {
+  lineY = titleY + titleBlockH + 16;
+}
 
   let trackingData:
     | { months: string[]; categories: { name: string; values: number[] }[] }
@@ -381,8 +385,35 @@ export function buildStackedVerticalSvg({
   const barsWidth = barsRight - barsLeft;
 
   const chartTop = lineY + S(50);
-  const chartBottom = H - marginBottom - S(400);
-  const chartHeight = chartBottom - chartTop;
+
+// ✅ Reserva REAL de abajo: meses + leyenda (2 columnas)
+const legendCols = 2;
+const legendRows = Math.ceil(categories.length / legendCols);
+
+const squareSize = 18;       // usa el tamaño real que ya dibujas
+const legendGapY = 10;       // usa el gap real que ya dibujas
+const legendItemH = squareSize; // o el alto de tu fila de leyenda
+const monthFs = isCensBrand ? S(27) : 20;
+const legendBlockH =
+  legendRows * legendItemH +
+  Math.max(0, legendRows - 1) * legendGapY +
+  20; // padding final
+const monthLineGap = S(4);
+const monthsBlockH = S(28) + (2 * monthFs) + monthLineGap + S(20); // baseY + 2 líneas + pad
+const bottomReserve = Math.max(monthsBlockH, S(110) + legendBlockH);
+const chartBottom = H - marginBottom - bottomReserve;
+
+const legendTop = chartBottom + S(110); // (usa el MISMO offset que quieres)
+
+
+// meses (máx 2 líneas)
+
+
+
+// ✅ ya no uses S(400)
+
+const chartHeight = chartBottom - chartTop;
+
 
   const monthsCount = months.length;
   const barSlot = monthsCount > 0 ? barsWidth / monthsCount : 0;
@@ -391,23 +422,15 @@ export function buildStackedVerticalSvg({
   const yMax = 100;
 
   const parts: string[] = [];
-  parts.push(
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
-    wantsCoolvetica
-      ? `<style type="text/css">
-  @font-face {
-    font-family: 'Coolvetica Rg';
-    src: url("data:font/woff2;base64,${COOLVETICA_WOFF2_BASE64}") format("woff2");
-    font-weight: 400;
-    font-style: normal;
-  }
-</style>`
-      : "",
-    `<rect width="100%" height="100%" fill="${bg}" />`
-  );
+parts.push(
+  `<?xml version="1.0" encoding="UTF-8"?>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+  `<rect width="100%" height="100%" fill="${bg}" />`,
+  `<g id="chart-content">`
+);
 
-  if (sheetTitle) {
+
+if (!hideHeaderAndTitle && sheetTitle) {
     const headerY = marginTop - S(24);
     const centerX = W / 2;
     const rightX = W - marginRight;
@@ -441,6 +464,7 @@ export function buildStackedVerticalSvg({
   const titleWeight = 600;
   const titleLineGapRender = isCensBrand ? S(18) : 25;
 
+  if (!hideHeaderAndTitle) {
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGapRender);
     parts.push(
@@ -452,17 +476,20 @@ export function buildStackedVerticalSvg({
              text-anchor="start">${esc(line)}</text>`
     );
   });
+}
 
-  if (isCensBrand) {
-    parts.push(
-      `<text x="${marginLeft}" y="${trackingLabelY}"
-             fill="${mainTextColor}"
-             font-family="${FONT_STACK}"
-             font-size="${trackingLabelFs}"
-             font-weight="700"
-             text-anchor="start">Tracking</text>`
-    );
-  }
+
+  if (!hideHeaderAndTitle && isCensBrand) {
+  parts.push(
+    `<text x="${marginLeft}" y="${trackingLabelY}"
+           fill="${mainTextColor}"
+           font-family="${FONT_STACK}"
+           font-size="${trackingLabelFs}"
+           font-weight="700"
+           text-anchor="start">Tracking</text>`
+  );
+}
+
 
   parts.push(
     `<line x1="${barsLeft}" y1="${chartTop}" x2="${barsLeft}" y2="${chartBottom}"
@@ -578,12 +605,7 @@ yTicks.forEach((v) => {
     );
   });
 
-  const legendTop = chartBottom + S(110);
-  const legendCols = 2;
   const legendItemHeight = S(24);
-  const legendGapY = S(20);
-
-  const squareSize = S(25);
   const legendFontSize = isCensBrand ? S(34) : 20;
 
   const colLabelMaxLens = new Array(legendCols).fill(0);
@@ -596,7 +618,6 @@ yTicks.forEach((v) => {
   const approxCharW = isCensBrand ? 6 : 10;
   const colTextWidths = colLabelMaxLens.map((len) => len * approxCharW);
   const colWidths = colTextWidths.map((textW) => squareSize + S(8) + textW + S(18));
-
   const legendAreaLeft = barsLeft;
   const legendAreaRight = barsRight;
   const legendAreaWidth = legendAreaRight - legendAreaLeft;
@@ -609,7 +630,6 @@ yTicks.forEach((v) => {
     colOffsets[idx] = acc;
     return acc + w;
   }, 0);
-
   categories.forEach((cat, idx) => {
     const colIdx = idx % legendCols;
     const rowIdx = Math.floor(idx / legendCols);
@@ -634,8 +654,41 @@ yTicks.forEach((v) => {
     );
   });
 
-  parts.push(`</svg>`);
-  return parts.join("\n");
+  // ✅ calcula hasta dónde llega la leyenda
+
+
+// ===== Tight bounds para combined =====
+
+// hasta dónde llega abajo (ya lo tienes)
+const contentBottom = Math.min(H, legendTop + legendBlockH);
+
+// incluir labels del eje Y (van a la izquierda de barsLeft)
+const yAxisLabelPad = S(90);      // ajusta si quieres (80–110 suele bien)
+const rightPad = S(30);
+
+const boundsX = Math.max(0, barsLeft - yAxisLabelPad);
+const boundsRight = Math.min(W, barsRight + rightPad);
+const boundsW = Math.max(1, boundsRight - boundsX);
+
+// si ocultas header/título en combined, tu contenido real empieza en chartTop
+const boundsY = hideHeaderAndTitle ? Math.max(0, chartTop - S(20)) : 0;
+
+// bottom real
+const boundsBottom = Math.min(H, contentBottom);
+const boundsH = Math.max(1, boundsBottom - boundsY);
+parts.push(
+  `<rect id="content-bounds"
+        x="${boundsX}" y="${boundsY}"
+        width="${boundsW}" height="${boundsH}"
+        fill="none" opacity="0" />`,
+  `</g>`,
+  `</svg>`
+);
+
+
+
+return parts.join("\n");
+
 }
 
 function basicMsg(message: string, W = CANVAS_W, H = CANVAS_H): string {

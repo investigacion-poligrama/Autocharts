@@ -1,4 +1,7 @@
+// lib/chart-svgs.ts
 import type { ChartType, FrequencyData, DatasetColumn } from "@/app/page";
+import type { Brand } from "@/types/brand";
+
 import { buildDonutSvg } from "@/lib/export-donut-svg-poligrama";
 import { buildBarSvg } from "@/lib/export-bar-svg-poligrama";
 import { buildMatrixSvg } from "@/lib/export-matrix-svg-poligrama";
@@ -7,17 +10,19 @@ import { buildApprovalSvg } from "@/lib/export-approval-svg-poligrama";
 import { buildPartidoSvg } from "@/lib/export-partido-svg-poligrama";
 import { buildTrackingSvg } from "@/lib/export-tracking-svg-poligrama";
 import { buildMediumDonutSvg } from "@/lib/export-mediumdonut-svg-poligrama";
+
 import {
   buildStackedBarSvg,
   StackedRow,
   StackedSegment,
 } from "@/lib/export-stackedbar-svg-poligrama";
+
 import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
-import type { Brand } from "@/types/brand";
+
 import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
 import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
 import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
-import { ChartConfig } from "./chartconfig";
+
 import { MikebuildBarSvg } from "./export-bar-mikeflores";
 import { getBrandTheme } from "@/lib/brand-theme";
 import { buildTrackingMikeFloresSvg } from "./export-tracking-mike-flores";
@@ -25,43 +30,77 @@ import { buildTrackingWithPillsMikeFloresSvg } from "./export-trackingwpills-mik
 import { buildTableMikeFloresSvg } from "./export-table-mikeflores";
 import { buildDonutMikeFloresSvg } from "./export-donut-mikeflores";
 
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
+
 export interface ChartSvgArgs {
   data: FrequencyData[];
   title: string;
+
+  // generic dataset
   secondColumn?: string;
   columns?: DatasetColumn[];
   customColors?: Record<string, string>;
-  stackedColumns?: string[];
   sheetTitle?: string;
+
+  // sizing
   width?: number;
   height?: number;
+
+  // input modes
   inputMode?: "raw" | "summary";
-  labelOrder?: string[];
-  secondQuestionCell?: string;
-  secondAnswerRange?: string;
   sheetValues?: any[][];
+
+  // ordering
+  labelOrder?: string[];
+  matrixRowOrder?: string[];
+
+  // stacked (raw)
+  stackedColumns?: string[];
+
+  // stacked (summary)
   stackedLabelCells?: string;
   stackedRangesSummary?: string;
+
+  // matrix/tracking ranges
   answerRange?: string;
+  questionCell?: string;
+
+  // styling
   backgroundColor?: string;
   textColor?: string;
   brand?: Brand;
-  questionCell?: string;
-  matrixRowOrder?: string[];
+
+  // combined
   combinedCharts?: [
     { chartType: ChartType; args: ChartSvgArgs; title?: string },
     { chartType: ChartType; args: ChartSvgArgs; title?: string }
   ];
   isCombinedMode?: boolean;
+
+  // misc
   hideLegend?: boolean;
 }
 
+export type ChartSvgBuilder = (args: ChartSvgArgs) => string;
+
 /* ------------------------------------------------------------------ */
-/* helpers generales                                                   */
+/* Small utils                                                        */
 /* ------------------------------------------------------------------ */
+
+const BASE_BOUNDS = { x: 0, y: 0, w: 1920, h: 1080 };
+
+const esc = (s: string) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function isDeskoverBrand(a?: Brand) {
+  return a === "deskover";
+}
 
 function parsePercent(raw: unknown): number {
   if (raw == null) return NaN;
+
   let s = String(raw).trim();
   if (!s) return NaN;
 
@@ -75,72 +114,61 @@ function parsePercent(raw: unknown): number {
   return Number(n.toFixed(1));
 }
 
-function extractInnerSvg(svg: string) {
-  const start = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
-  if (start === -1) {
-    // fallback: quita wrapper <svg>
-    return svg
-      .replace(/^[\s\S]*?<svg[^>]*>/i, "")
-      .replace(/<\/svg>\s*$/i, "")
-      .replace(/<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i, "");
-  }
+/* ------------------------------------------------------------------ */
+/* SVG Extraction / Bounds                                             */
+/* ------------------------------------------------------------------ */
 
-  // encuentra apertura exacta del <g ...>
-  const openTagMatch = svg
-    .slice(start)
-    .match(/<g[^>]*id="chart-content"[^>]*>/i);
-  if (!openTagMatch) return "";
+type SvgBounds = { x: number; y: number; w: number; h: number };
+type ExtractedSvg = { inner: string; bounds: SvgBounds | null };
 
-  const openTag = openTagMatch[0];
-  const contentStart = start + openTag.length;
-
-  // ahora hay que encontrar el cierre correcto del </g>
-  let depth = 1;
-
-  const re = /<\/?g\b[^>]*>/gi;
-  re.lastIndex = contentStart;
-
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(svg))) {
-    const tag = match[0];
-    if (tag.startsWith("</")) depth--;
-    else depth++;
-
-    if (depth === 0) {
-      const contentEnd = match.index;
-      return svg.slice(contentStart, contentEnd);
+function getFallbackBoundsFromSvg(svg: string): SvgBounds | null {
+  const vbMatch = svg.match(/viewBox="([^"]+)"/i);
+  if (vbMatch) {
+    const nums = vbMatch[1].trim().split(/\s+/).map(Number);
+    if (nums.length === 4 && nums.every(Number.isFinite)) {
+      const [, , w, h] = nums;
+      if (w > 0 && h > 0) return { x: 0, y: 0, w, h };
     }
   }
 
-  return "";
+  const wMatch = svg.match(/\bwidth="([^"]+)"/i);
+  const hMatch = svg.match(/\bheight="([^"]+)"/i);
+  const w = wMatch ? Number(String(wMatch[1]).replace(/[^\d.]/g, "")) : NaN;
+  const h = hMatch ? Number(String(hMatch[1]).replace(/[^\d.]/g, "")) : NaN;
+  if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+    return { x: 0, y: 0, w, h };
+  }
+
+  return null;
 }
 
 /**
- * ✅ SOLO se usa en DESKOVER combined.
- * Extrae el inner de chart-content y, si existe, el rect id="content-bounds"
- * para poder “cropear” y centrar sin agarrar todo el canvas.
+ * Extrae el contenido dentro de <g id="chart-content"> ... </g>
+ * y opcionalmente el rect id="content-bounds".
+ * Si no existe <g id="chart-content">, hace fallback a “inner sin wrapper”.
  */
-function extractInnerSvgWithBounds(svg: string): {
-  inner: string;
-  bounds: { x: number; y: number; w: number; h: number } | null;
-} {
-  const start = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
-  if (start === -1) {
+function extractChartContent(svg: string, wantBounds: boolean): ExtractedSvg {
+  const gStart = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
+
+  // Fallback: quita wrapper <svg> y rect full background
+  if (gStart === -1) {
     const inner = svg
       .replace(/^[\s\S]*?<svg[^>]*>/i, "")
       .replace(/<\/svg>\s*$/i, "")
       .replace(/<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i, "");
-    return { inner, bounds: null };
+
+    return { inner, bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
   }
 
-  const openTagMatch = svg
-    .slice(start)
-    .match(/<g[^>]*id="chart-content"[^>]*>/i);
-  if (!openTagMatch) return { inner: "", bounds: null };
+  const openTagMatch = svg.slice(gStart).match(/<g[^>]*id="chart-content"[^>]*>/i);
+  if (!openTagMatch) {
+    return { inner: "", bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
+  }
 
   const openTag = openTagMatch[0];
-  const contentStart = start + openTag.length;
+  const contentStart = gStart + openTag.length;
 
+  // Encontrar cierre correcto del </g> con depth
   let depth = 1;
   const re = /<\/?g\b[^>]*>/gi;
   re.lastIndex = contentStart;
@@ -155,38 +183,13 @@ function extractInnerSvgWithBounds(svg: string): {
       const contentEnd = match.index;
       const inner = svg.slice(contentStart, contentEnd);
 
-      // bounds rect (si existe)
-      // bounds rect (si existe)
-const rectMatch = inner.match(/<rect[^>]*id="content-bounds"[^>]*>/i);
+      if (!wantBounds) return { inner, bounds: null };
 
-// ✅ fallback: si no hay content-bounds, usa el viewBox del SVG completo
-const vbMatch = svg.match(/viewBox="([^"]+)"/i);
-let fallbackBounds: { x: number; y: number; w: number; h: number } | null = null;
-
-if (vbMatch) {
-  const nums = vbMatch[1].trim().split(/\s+/).map(Number);
-  if (nums.length === 4 && nums.every((n) => Number.isFinite(n))) {
-    const [, , w, h] = nums;
-    if (w > 0 && h > 0) fallbackBounds = { x: 0, y: 0, w, h };
-  }
-}
-
-// si no hay viewBox, intenta width/height
-if (!fallbackBounds) {
-  const wMatch = svg.match(/\bwidth="([^"]+)"/i);
-  const hMatch = svg.match(/\bheight="([^"]+)"/i);
-  const w = wMatch ? Number(String(wMatch[1]).replace(/[^\d.]/g, "")) : NaN;
-  const h = hMatch ? Number(String(hMatch[1]).replace(/[^\d.]/g, "")) : NaN;
-  if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-    fallbackBounds = { x: 0, y: 0, w, h };
-  }
-}
-
-if (!rectMatch) {
-  // ✅ IMPORTANT: ya no regreses null, regresa fallbackBounds
-  return { inner, bounds: fallbackBounds };
-}
-
+      // 1) busca content-bounds dentro del inner
+      const rectMatch = inner.match(/<rect[^>]*id="content-bounds"[^>]*>/i);
+      if (!rectMatch) {
+        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
+      }
 
       const rect = rectMatch[0];
       const getNum = (attr: string) => {
@@ -200,38 +203,66 @@ if (!rectMatch) {
       const h = getNum("height");
 
       if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) {
-        return { inner, bounds: null };
+        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
       }
 
       return { inner, bounds: { x, y, w, h } };
     }
   }
 
-  return { inner: "", bounds: null };
+  return { inner: "", bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
+}
+
+function extractInnerSvg(svg: string) {
+  return extractChartContent(svg, false).inner;
+}
+
+function extractInnerSvgWithBounds(svg: string) {
+  return extractChartContent(svg, true);
+}
+
+function namespaceSvgIds(fragment: string, prefix: string) {
+  if (!fragment) return fragment;
+
+  const ids = new Set<string>();
+  fragment.replace(/\bid="([^"]+)"/g, (_m, id) => {
+    ids.add(id);
+    return _m;
+  });
+
+  let out = fragment;
+  ids.forEach((id) => {
+    const nid = `${prefix}${id}`;
+    out = out.replace(new RegExp(`\\bid="${id}"`, "g"), `id="${nid}"`);
+    out = out.replace(new RegExp(`url\\(#${id}\\)`, "g"), `url(#${nid})`);
+    out = out.replace(new RegExp(`\\bhref="#${id}"`, "g"), `href="#${nid}"`);
+    out = out.replace(new RegExp(`\\bxlink:href="#${id}"`, "g"), `xlink:href="#${nid}"`);
+  });
+
+  return out;
 }
 
 function placeIntoSlot(
   inner: string,
-  bounds: { x: number; y: number; w: number; h: number } | null,
+  bounds: SvgBounds | null,
   slotW: number,
   slotH: number,
   opts?: {
     allowUpscale?: boolean;
     maxScale?: number;
     margin?: number;
-    forceScale?: number;           // ✅ nuevo: fuerza escala final (antes de margin)
-    alignY?: "center" | "top";     // ✅ nuevo: para respetar top padding visual
+    forceScale?: number;
+    alignY?: "center" | "top";
+      alignX?: "center" | "left";   
   }
 ) {
-  if (!bounds) bounds = { x: 0, y: 0, w: 1920, h: 1080 };
+  const b = bounds ?? BASE_BOUNDS;
 
-  const fitScale = Math.min(slotW / bounds.w, slotH / bounds.h);
-
+  const fitScale = Math.min(slotW / b.w, slotH / b.h);
   const allowUpscale = opts?.allowUpscale ?? false;
   const maxScale = opts?.maxScale ?? 1.35;
   const margin = opts?.margin ?? 0.96;
 
-  // ✅ si viene forceScale, úsalo (pero nunca más grande que fitScale)
   const baseScale =
     typeof opts?.forceScale === "number"
       ? Math.min(opts.forceScale, fitScale)
@@ -241,65 +272,23 @@ function placeIntoSlot(
 
   const s = baseScale * margin;
 
-  const scaledW = bounds.w * s;
-  const scaledH = bounds.h * s;
+  const scaledW = b.w * s;
+  const scaledH = b.h * s;
+const alignX = opts?.alignX ?? "center";
+const dx = alignX === "left" ? 0 : (slotW - scaledW) / 2;
 
-  const dx = (slotW - scaledW) / 2;
-
-  // ✅ center vs top
   const alignY = opts?.alignY ?? "center";
   const dy = alignY === "top" ? 0 : (slotH - scaledH) / 2;
 
   return `
-    <g transform="translate(${dx},${dy}) scale(${s}) translate(${-bounds.x},${-bounds.y})">
+    <g transform="translate(${dx},${dy}) scale(${s}) translate(${-b.x},${-b.y})">
       ${inner}
     </g>
   `.trim();
 }
 
-
-
-
-function namespaceSvgIds(fragment: string, prefix: string) {
-  if (!fragment) return fragment;
-
-  // 1) recolecta ids presentes
-  const ids = new Set<string>();
-  fragment.replace(/\bid="([^"]+)"/g, (_m, id) => {
-    ids.add(id);
-    return _m;
-  });
-
-  // 2) reemplaza id="x" => id="prefix-x" y referencias url(#x), href="#x", etc.
-  let out = fragment;
-  ids.forEach((id) => {
-    const nid = `${prefix}${id}`;
-
-    // id="..."
-    out = out.replace(new RegExp(`\\bid="${id}"`, "g"), `id="${nid}"`);
-
-    // url(#...)
-    out = out.replace(new RegExp(`url\\(#${id}\\)`, "g"), `url(#${nid})`);
-
-    // href="#..."
-    out = out.replace(new RegExp(`\\bhref="#${id}"`, "g"), `href="#${nid}"`);
-
-    // xlink:href="#..."
-    out = out.replace(
-      new RegExp(`\\bxlink:href="#${id}"`, "g"),
-      `xlink:href="#${nid}"`
-    );
-  });
-
-  return out;
-}
-
-
-const esc = (s: string) =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 /* ------------------------------------------------------------------ */
-/* stacked: modo RAW (base de datos) – tu lógica original             */
+/* Stacked RAW                                                        */
 /* ------------------------------------------------------------------ */
 
 function makeStackedRowsRaw({
@@ -309,7 +298,6 @@ function makeStackedRowsRaw({
 }: ChartSvgArgs): StackedRow[] {
   if (!stackedColumns.length) return [];
 
-  // categorías = orden del DragList si existe, si no, fallback a primera col
   let categories: string[] = [];
 
   if (labelOrder.length > 0) {
@@ -343,27 +331,25 @@ function makeStackedRowsRaw({
       if (colIndex === -1) return null;
 
       const questionCol = columns[colIndex];
+
+      // intenta usar columna % al lado (si parece porcentaje)
       let percentCol: DatasetColumn | undefined;
       const candidate = columns[colIndex + 1];
 
       if (candidate) {
         const nameLooksLikePercent = /porcentaje/i.test(candidate.name);
         const hasNumeric = candidate.values.some((v) => !Number.isNaN(parsePercent(v)));
-        if (nameLooksLikePercent || hasNumeric) {
-          percentCol = candidate;
-        }
+        if (nameLooksLikePercent || hasNumeric) percentCol = candidate;
       }
+
       if (!percentCol) {
-        const segments = makeRawSegments(questionCol);
-        return { label: colName, segments };
+        return { label: colName, segments: makeRawSegments(questionCol) };
       }
+
       const segments = categories.map((cat) => {
         const rowIdx = questionCol.values.findIndex((v) => v === cat);
         const rawPct = rowIdx === -1 ? NaN : parsePercent(percentCol!.values[rowIdx]);
-        return {
-          label: cat,
-          percentage: Number((rawPct || 0).toFixed(1)),
-        };
+        return { label: cat, percentage: Number((rawPct || 0).toFixed(1)) };
       });
 
       return { label: colName, segments };
@@ -372,23 +358,20 @@ function makeStackedRowsRaw({
 }
 
 /* ------------------------------------------------------------------ */
-/* stacked: modo SUMMARY (tabla de resultados)                        */
+/* Stacked SUMMARY (A1)                                                */
 /* ------------------------------------------------------------------ */
 
 function a1ToRowColSummary(a1: string) {
   const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
-  if (!match) {
-    throw new Error(`Referencia A1 inválida: ${a1}`);
-  }
+  if (!match) throw new Error(`Referencia A1 inválida: ${a1}`);
+
   const [, colLetters, rowStr] = match;
   let col = 0;
-  for (const ch of colLetters) {
-    col = col * 26 + (ch.charCodeAt(0) - 64); // A=1
-  }
+  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
+
   const row = parseInt(rowStr, 10);
-  if (!row || row < 1) {
-    throw new Error(`Fila inválida en referencia A1: ${a1}`);
-  }
+  if (!row || row < 1) throw new Error(`Fila inválida en referencia A1: ${a1}`);
+
   return { row, col }; // 1-based
 }
 
@@ -419,10 +402,7 @@ function buildSummarySegmentsFromRange(values: any[][], range: string): StackedS
 
   const { rowStart, rowEnd, colStart, colEnd } = parsed;
   if (colEnd < colStart + 1) {
-    console.warn(
-      "El rango de stacked debería incluir al menos dos columnas (etiqueta y %).",
-      trimmed
-    );
+    console.warn("El rango stacked debería incluir al menos dos columnas (etiqueta y %).", trimmed);
   }
 
   const segments: StackedSegment[] = [];
@@ -447,10 +427,7 @@ function buildSummarySegmentsFromRange(values: any[][], range: string): StackedS
       if (!Number.isNaN(parsedNum)) percNum = parsedNum;
     }
 
-    segments.push({
-      label,
-      percentage: Number(percNum.toFixed(1)),
-    });
+    segments.push({ label, percentage: Number(percNum.toFixed(1)) });
   }
 
   return segments;
@@ -500,38 +477,438 @@ function makeStackedRowsSummary({
 }
 
 /* ------------------------------------------------------------------ */
-/* builders por tipo de gráfica                                       */
+/* Combined rendering                                                   */
 /* ------------------------------------------------------------------ */
 
-export type ChartSvgBuilder = (args: ChartSvgArgs) => string;
+function svgWrapper(W: number, H: number, bg: string, content: string) {
+  return `
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <rect width="100%" height="100%" fill="${bg}"/>
+  ${content}
+</svg>
+`.trim();
+}
 
-export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
-  donut: (args) => {
-    const isMike = args.brand === "deskover";
+function buildCombinedPoligramaSideBySide(
+  leftSvg: string,
+  rightSvg: string,
+  W: number,
+  H: number,
+  bg: string
+) {
+  const halfW = Math.round(W / 2);
+  const innerL = extractInnerSvg(leftSvg);
+  const innerR = extractInnerSvg(rightSvg);
 
-    if (isMike) {
-      return buildDonutMikeFloresSvg({
-        ...args,
-        width: args.width,
-        height: args.height,
-        backgroundColor: args.backgroundColor,
-        textColor: args.textColor,
-        customColors: args.customColors,
-        isCombinedMode: args.isCombinedMode,
+  return svgWrapper(
+    W,
+    H,
+    bg,
+    `
+  <g transform="translate(0,0)">${innerL}</g>
+  <g transform="translate(${halfW},0)">${innerR}</g>
+    `.trim()
+  );
+}
+
+function buildCombinedDeskoverVerticalWithCommonScale(
+  svgA: string,
+  svgB: string,
+  W: number,
+  H: number,
+  bg: string,
+  layout?: { topShare?: number; topPadShare?: number; gapShare?: number }
+) {
+  const TOP_PAD = Math.round(H * (layout?.topPadShare ?? 0.06));
+  const GAP = Math.round(H * (layout?.gapShare ?? 0.03));
+
+  const availableH = H - TOP_PAD - GAP;
+  const topH = Math.round(availableH * (layout?.topShare ?? 0.5));
+  const bottomH = availableH - topH;
+
+  const A = extractInnerSvgWithBounds(svgA);
+  const B = extractInnerSvgWithBounds(svgB);
+
+  const innerA = namespaceSvgIds(A.inner, "c1-");
+  const innerB = namespaceSvgIds(B.inner, "c2-");
+
+  const fitA = Math.min(W / (A.bounds?.w ?? BASE_BOUNDS.w), topH / (A.bounds?.h ?? BASE_BOUNDS.h));
+  const fitB = Math.min(
+    W / (B.bounds?.w ?? BASE_BOUNDS.w),
+    bottomH / (B.bounds?.h ?? BASE_BOUNDS.h)
+  );
+  const commonScale = Math.min(fitA, fitB);
+
+  const placedA = placeIntoSlot(innerA, A.bounds, W, topH, {
+    allowUpscale: true,
+    maxScale: 1.35,
+    margin: 0.98,
+    forceScale: commonScale,
+    alignY: "top",
+  });
+
+  const placedB = placeIntoSlot(innerB, B.bounds, W, bottomH, {
+    allowUpscale: true,
+    maxScale: 1.35,
+    margin: 0.98,
+    forceScale: commonScale,
+    alignY: "top",
+  });
+
+  const yTop = TOP_PAD;
+  const yBottom = TOP_PAD + topH + GAP;
+
+  return `
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="${W}" height="${H}"
+     viewBox="0 0 ${W} ${H}"
+     preserveAspectRatio="xMidYMid meet"
+     overflow="visible">
+  <rect width="100%" height="100%" fill="${bg}"/>
+  <g transform="translate(0,${yTop})">${placedA}</g>
+  <g transform="translate(0,${yBottom})">${placedB}</g>
+</svg>
+`.trim();
+}
+
+/* ------------------------------------------------------------------ */
+/* Builders                                                            */
+/* ------------------------------------------------------------------ */
+
+function buildDonutByBrand(args: ChartSvgArgs) {
+  if (isDeskoverBrand(args.brand)) {
+    return buildDonutMikeFloresSvg({
+      ...args,
+      customColors: args.customColors,
+      isCombinedMode: args.isCombinedMode,
+    });
+  }
+
+  return buildDonutSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+  });
+}
+
+function buildTrackingByBrand(args: ChartSvgArgs) {
+  if (isDeskoverBrand(args.brand)) {
+    return buildTrackingMikeFloresSvg({
+      ...args,
+      sheetValues: args.sheetValues,
+      answerRange: args.answerRange,
+      isCombinedMode: args.isCombinedMode,
+      hideLegend: args.hideLegend,
+    });
+  }
+
+  return buildTrackingSvg({
+    data: args.data,
+    title: args.title,
+    columns: args.columns ?? [],
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    inputMode: args.inputMode,
+    sheetValues: args.sheetValues,
+    answerRange: args.answerRange,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+    isCombinedMode: args.isCombinedMode,
+    hideLegend: args.hideLegend,
+  });
+}
+
+function buildTrackingPillsByBrand(args: ChartSvgArgs) {
+  if (isDeskoverBrand(args.brand)) {
+    return buildTrackingWithPillsMikeFloresSvg({
+      ...args,
+      sheetValues: args.sheetValues,
+      answerRange: args.answerRange,
+      isCombinedMode: args.isCombinedMode,
+      hideLegend: args.hideLegend,
+    });
+  }
+  // Poligrama: fallback a tracking normal
+  return buildTrackingByBrand(args);
+}
+
+function buildStacked(args: ChartSvgArgs) {
+  const stackedData: StackedRow[] =
+    args.inputMode === "summary" ? makeStackedRowsSummary(args) : makeStackedRowsRaw(args);
+
+  return buildStackedBarSvg({
+    data: stackedData,
+    title: args.title,
+    customColors: args.customColors,
+    sheetTitle: args.sheetTitle,
+    width: args.width,
+    height: args.height,
+    backgroundColor: args.backgroundColor,
+    textColor: args.textColor,
+  });
+}
+
+function buildMikeBar(args: ChartSvgArgs) {
+  const theme = getBrandTheme(args.brand ?? "poligrama");
+
+  return MikebuildBarSvg({
+    data: args.data,
+    title: args.title,
+    customColors: args.customColors,
+    width: args.width,
+    height: args.height,
+    isCombinedMode: args.isCombinedMode,
+    backgroundColor: args.backgroundColor ?? theme.defaultBackground,
+    textColor: args.textColor ?? theme.defaultTextColor,
+  });
+}
+
+function buildCombined(args: ChartSvgArgs) {
+  if (!args.combinedCharts) return "";
+  const [a, b] = args.combinedCharts;
+  if (a.chartType === "combined" || b.chartType === "combined") return "";
+
+  const W = args.width ?? 1920;
+  const H = args.height ?? 1080;
+  const bg = args.backgroundColor ?? "#000";
+
+  const deskover = isDeskoverBrand(a.args.brand ?? b.args.brand);
+
+  const hasTracking = a.chartType === "tracking" || b.chartType === "tracking";
+
+  // ---------- TRACKING special layout ----------
+  if (hasTracking) {
+    const trackingChart = a.chartType === "tracking" ? a : b;
+    const otherChart = a.chartType === "tracking" ? b : a;
+
+    if (deskover) {
+      // Deskover arriba/abajo, tracking abajo más grande
+      const BASE_W = 1920;
+      const BASE_H = 1080;
+
+      const svgOther = chartSvgBuilders[otherChart.chartType]({
+        ...otherChart.args,
+        width: BASE_W,
+        height: BASE_H,
+        isCombinedMode: true,
+      });
+
+      const svgTracking = chartSvgBuilders[trackingChart.chartType]({
+        ...trackingChart.args,
+        width: BASE_W,
+        height: BASE_H,
+        isCombinedMode: true,
+        hideLegend: true,
+      });
+
+      // topShare 0.42 (como lo traías)
+      return buildCombinedDeskoverVerticalWithCommonScale(svgOther, svgTracking, W, H, bg, {
+        topShare: 0.42,
+        topPadShare: 0.06,
+        gapShare: 0.03,
       });
     }
 
-    return buildDonutSvg({
-      data: args.data,
-      title: args.title,
-      customColors: args.customColors,
-      sheetTitle: args.sheetTitle,
-      width: args.width,
-      height: args.height,
-      backgroundColor: args.backgroundColor,
-      textColor: args.textColor,
+    // Poligrama: izquierda/derecha
+    const otherW = Math.round(W * 0.25);
+    const trackingW = W - otherW;
+
+    const svgOther = chartSvgBuilders[otherChart.chartType]({
+      ...otherChart.args,
+      width: otherW,
+      height: H,
+      isCombinedMode: true,
     });
-  },
+
+    const svgTracking = chartSvgBuilders[trackingChart.chartType]({
+      ...trackingChart.args,
+      width: trackingW,
+      height: H,
+      isCombinedMode: true,
+      hideLegend: true,
+    });
+
+    const innerOther = extractInnerSvg(svgOther);
+    const innerTracking = extractInnerSvg(svgTracking);
+
+    return svgWrapper(
+      W,
+      H,
+      bg,
+      `
+  <g transform="translate(0,0)">${innerOther}</g>
+  <g transform="translate(${otherW},0)">${innerTracking}</g>
+      `.trim()
+    );
+
+    
+  }
+
+  // ---------- DEFAULT combined ----------
+  const brand = (a.args.brand ?? b.args.brand) as Brand | undefined;
+  const isCens = brand === "censEdmundSinsa";
+
+if (isCens) {
+
+// dentro de buildCombined(args) -> if (isCens) { ... }
+
+// ✅ B) Fuerza el orden: narrow arriba, stacked abajo
+const topChart =
+  a.chartType === "narrowvertbars" ? a :
+  b.chartType === "narrowvertbars" ? b :
+  a; // fallback
+
+const bottomChart =
+  topChart === a ? b : a;
+
+// (opcional pero recomendado) si quieres ser estricto:
+/// if (topChart.chartType !== "narrowvertbars" || bottomChart.chartType !== "stackedvertical") {
+///   console.warn("CENS combined esperaba narrowvertbars arriba y stackedvertical abajo");
+/// }
+
+const outBg = args.backgroundColor ?? "#ffffff";
+const outW = 612;
+const outH = 792;
+
+const BASE_W = 1440;
+const BASE_H = 1800;
+
+// ✅ usa topChart / bottomChart en lugar de a / b
+const svgTop = chartSvgBuilders[topChart.chartType]({
+  ...topChart.args,
+  width: BASE_W,
+  height: BASE_H,
+  isCombinedMode: true, // (recomendado, para que no achique)
+});
+
+const svgBottom = chartSvgBuilders[bottomChart.chartType]({
+  ...bottomChart.args,
+  width: BASE_W,
+  height: BASE_H,
+  isCombinedMode: true,
+});
+
+
+  const top = extractInnerSvgWithBounds(svgTop);
+  const bottom = extractInnerSvgWithBounds(svgBottom);
+
+  const topB = top.bounds ?? { x: 0, y: 0, w: outW, h: outH };
+  const bottomB = bottom.bounds ?? { x: 0, y: 0, w: outW, h: outH };
+
+  const topInner = namespaceSvgIds(top.inner, "c1-");
+  const bottomInner = namespaceSvgIds(bottom.inner, "c2-");
+
+  const TOP_PAD = Math.round(outH * 0.01);
+  const GAP = Math.round(outH * 0.015);
+  const availableH = outH - TOP_PAD - GAP;
+
+  // reparto por content-bounds, con clamps
+  const rawShare = topB.h / Math.max(1, topB.h + bottomB.h);
+  const topShare = Math.min(0.62, Math.max(0.38, rawShare));
+  const topH = Math.max(1, Math.round(availableH * topShare));
+  const bottomH = Math.max(1, availableH - topH);
+
+  // ✅ common scale (igual que Deskover)
+  // ✅ Opción A: escala independiente (evita que el peor "encoga" a los dos)
+const scaleTop = Math.min(outW / topB.w);
+const scaleBottom = Math.min(outW / bottomB.w);
+
+const placedTop = placeIntoSlot(topInner, topB, outW, topH, {
+  forceScale: scaleTop,
+  margin: 1,
+  alignY: "top",
+  alignX: "center",
+  allowUpscale: true,
+  maxScale: 1.5,
+});
+
+const placedBottom = placeIntoSlot(bottomInner, bottomB, outW, bottomH, {
+  forceScale: scaleBottom,
+  margin: 1,
+  alignY: "top",
+  alignX: "center",
+  allowUpscale: true,
+  maxScale: 1.5,
+});
+
+  const clipTopId = "clip-top";
+  const clipBottomId = "clip-bottom";
+
+  return `
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${outW} ${outH}">
+  <rect width="100%" height="100%" fill="${outBg}"/>
+
+  <defs>
+    <clipPath id="${clipTopId}">
+      <rect x="0" y="0" width="${outW}" height="${topH}" />
+    </clipPath>
+    <clipPath id="${clipBottomId}">
+      <rect x="0" y="0" width="${outW}" height="${bottomH}" />
+    </clipPath>
+  </defs>
+
+  <g transform="translate(0,${TOP_PAD})" clip-path="url(#${clipTopId})">
+    ${placedTop}
+  </g>
+
+  <g transform="translate(0,${TOP_PAD + topH + GAP})" clip-path="url(#${clipBottomId})">
+    ${placedBottom}
+  </g>
+</svg>
+`.trim();
+}
+
+
+
+  
+  if (deskover) {
+    const BASE_W = 1920;
+    const BASE_H = 1080;
+
+    const svgA = chartSvgBuilders[a.chartType]({
+      ...a.args,
+      width: BASE_W,
+      height: BASE_H,
+      isCombinedMode: true,
+    });
+
+    const svgB = chartSvgBuilders[b.chartType]({
+      ...b.args,
+      width: BASE_W,
+      height: BASE_H,
+      isCombinedMode: true,
+    });
+
+    return buildCombinedDeskoverVerticalWithCommonScale(svgA, svgB, W, H, bg, {
+      topShare: 0.5,
+      topPadShare: 0.06,
+      gapShare: 0.03,
+    });
+  }
+
+  // Poligrama: side-by-side half/half
+  const halfW = Math.round(W / 2);
+  const svgA = chartSvgBuilders[a.chartType]({ ...a.args, width: halfW, height: H, isCombinedMode: true });
+  const svgB = chartSvgBuilders[b.chartType]({ ...b.args, width: halfW, height: H, isCombinedMode: true });
+  return buildCombinedPoligramaSideBySide(svgA, svgB, W, H, bg);
+}
+
+/* ------------------------------------------------------------------ */
+/* Exported builder map                                                */
+/* ------------------------------------------------------------------ */
+
+export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
+  donut: buildDonutByBrand,
 
   bar: (args) =>
     buildBarSvg({
@@ -598,50 +975,9 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       textColor: args.textColor,
     }),
 
-  tracking: (args) => {
-    const isMike = args.brand === "deskover";
-    if (isMike) {
-      return buildTrackingMikeFloresSvg({
-        ...args,
-        sheetValues: args.sheetValues,
-        answerRange: args.answerRange,
-        isCombinedMode: args.isCombinedMode,
-        hideLegend: args.hideLegend,
-      });
-    }
+  tracking: buildTrackingByBrand,
 
-    return buildTrackingSvg({
-      data: args.data,
-      title: args.title,
-      columns: args.columns ?? [],
-      customColors: args.customColors,
-      sheetTitle: args.sheetTitle,
-      width: args.width,
-      height: args.height,
-      inputMode: args.inputMode,
-      sheetValues: args.sheetValues,
-      answerRange: args.answerRange,
-      backgroundColor: args.backgroundColor,
-      textColor: args.textColor,
-      isCombinedMode: args.isCombinedMode,
-      hideLegend: args.hideLegend,
-    });
-  },
-
-  trackingpills: (args) => {
-    const isMike = args.brand === "deskover";
-    if (isMike) {
-      return buildTrackingWithPillsMikeFloresSvg({
-        ...args,
-        sheetValues: args.sheetValues,
-        answerRange: args.answerRange,
-        isCombinedMode: args.isCombinedMode,
-        hideLegend: args.hideLegend,
-      });
-    }
-
-    return chartSvgBuilders.tracking(args);
-  },
+  trackingpills: buildTrackingPillsByBrand,
 
   mediumdonut: (args) =>
     buildMediumDonutSvg({
@@ -662,21 +998,7 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       textColor: args.textColor,
     }),
 
-  stacked: (args) => {
-    const stackedData: StackedRow[] =
-      args.inputMode === "summary" ? makeStackedRowsSummary(args) : makeStackedRowsRaw(args);
-
-    return buildStackedBarSvg({
-      data: stackedData,
-      title: args.title,
-      customColors: args.customColors,
-      sheetTitle: args.sheetTitle,
-      width: args.width,
-      height: args.height,
-      backgroundColor: args.backgroundColor,
-      textColor: args.textColor,
-    });
-  },
+  stacked: buildStacked,
 
   stackedvertical: (args) =>
     buildStackedVerticalSvg({
@@ -693,6 +1015,7 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       backgroundColor: args.backgroundColor,
       textColor: args.textColor,
       brand: args.brand,
+      isCombinedMode: args.isCombinedMode,
     }),
 
   barnarrow: (args) =>
@@ -736,26 +1059,13 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
       textColor: args.textColor,
       brand: args.brand,
       headerLeftLabel: "Monterrey, Nuevo León",
+      isCombinedMode: args.isCombinedMode,
     }),
 
-  mikebar: (args) => {
-    const theme = getBrandTheme(args.brand ?? "poligrama");
-
-    return MikebuildBarSvg({
-      data: args.data,
-      title: args.title,
-      customColors: args.customColors,
-      width: args.width,
-      height: args.height,
-      isCombinedMode: args.isCombinedMode,
-      backgroundColor: args.backgroundColor ?? theme.defaultBackground,
-      textColor: args.textColor ?? theme.defaultTextColor,
-    });
-  },
+  mikebar: buildMikeBar,
 
   table: (args) => {
-    const isMike = args.brand === "deskover";
-    if (!isMike) return "";
+    if (!isDeskoverBrand(args.brand)) return "";
     return buildTableMikeFloresSvg({
       ...args,
       sheetValues: args.sheetValues,
@@ -764,237 +1074,5 @@ export const chartSvgBuilders: Record<ChartType, ChartSvgBuilder> = {
     });
   },
 
-  combined: (args) => {
-    if (!args.combinedCharts) return "";
-    const [a, b] = args.combinedCharts;
-    if (a.chartType === "combined" || b.chartType === "combined") return "";
-
-    const W = args.width ?? 1920;
-    const H = args.height ?? 1080;
-    const bg = args.backgroundColor ?? "#000";
-
-    const isDeskover = (a.args.brand ?? b.args.brand) === "deskover";
-
-    // ✅ tracking special layout
-    const hasTracking = a.chartType === "tracking" || b.chartType === "tracking";
-
-    if (hasTracking) {
-      const trackingChart = a.chartType === "tracking" ? a : b;
-      const otherChart = a.chartType === "tracking" ? b : a;
-
-      if (isDeskover) {
-        // --- Deskover: arriba/abajo (tracking abajo más grande) ---
-        const otherH = Math.round(H * 0.25);
-
-  // ✅ margen arriba del canvas para el chart superior
-  const TOP_PAD = Math.round(H * 0.06);
-  const GAP = Math.round(H * 0.03);
-
-  const availableH = H - TOP_PAD - GAP;
-
-  // ✅ arriba más grande que 0.25 para que NO se vea mini
-  const topH = Math.round(availableH * 0.42);  // prueba 0.40–0.45
-  const trackingH = availableH - topH;
-
-        const BASE_W = 1920;
-const BASE_H = 1080;
-
-const svgOther = chartSvgBuilders[otherChart.chartType]({
-  ...otherChart.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true,
-});
-
-const svgTracking = chartSvgBuilders[trackingChart.chartType]({
-  ...trackingChart.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true,
-  hideLegend: true,
-});
-
-
- const other = extractInnerSvgWithBounds(svgOther);
-  const tracking = extractInnerSvgWithBounds(svgTracking);
-
-  const otherInner = namespaceSvgIds(other.inner, "c1-");
-  const trackingInner = namespaceSvgIds(tracking.inner, "c2-");
-
-  const fitOther = Math.min(W / (other.bounds?.w ?? 1920), topH / (other.bounds?.h ?? 1080));
-  const fitTrack = Math.min(W / (tracking.bounds?.w ?? 1920), trackingH / (tracking.bounds?.h ?? 1080));
-  const commonScale = Math.min(fitOther, fitTrack);
-
-  const otherPlaced = placeIntoSlot(otherInner, other.bounds, W, topH, {
-    allowUpscale: true,
-    maxScale: 1.35,
-    margin: 0.98,
-    forceScale: commonScale,
-    alignY: "top",
-  });
-
-  const trackingPlaced = placeIntoSlot(trackingInner, tracking.bounds, W, trackingH, {
-    allowUpscale: true,
-    maxScale: 1.35,
-    margin: 0.98,
-    forceScale: commonScale,
-    alignY: "top",
-  });
-
-  const yTop = TOP_PAD;
-  const yBottom = TOP_PAD + topH + GAP;
-
-  return `
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg"
-     width="${W}" height="${H}"
-     viewBox="0 0 ${W} ${H}"
-     preserveAspectRatio="xMidYMid meet"
-     overflow="visible">
-  <rect width="100%" height="100%" fill="${bg}"/>
-  <g transform="translate(0,${yTop})">${otherPlaced}</g>
-  <g transform="translate(0,${yBottom})">${trackingPlaced}</g>
-</svg>
-`.trim();
-}
-      // --- Poligrama: izquierda/derecha (SIN CAMBIOS) ---
-      const otherW = Math.round(W * 0.25);
-      const trackingW = W - otherW;
-
-      const svgOther = chartSvgBuilders[otherChart.chartType]({
-        ...otherChart.args,
-        width: otherW,
-        height: H,
-        isCombinedMode: true,
-      });
-
-      const svgTracking = chartSvgBuilders[trackingChart.chartType]({
-        ...trackingChart.args,
-        width: trackingW,
-        height: H,
-        isCombinedMode: true,
-        hideLegend: true,
-      });
-
-      const innerOther = extractInnerSvg(svgOther);
-      const innerTracking = extractInnerSvg(svgTracking);
-
-      return `
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="${bg}"/>
-  <g transform="translate(0,0)">${innerOther}</g>
-  <g transform="translate(${otherW},0)">${innerTracking}</g>
-</svg>
-`.trim();
-    }
-
-    // ✅ default layout
-    if (isDeskover) {
-      // --- Deskover: arriba/abajo ---
- const halfH = Math.round(H / 2);
-
-  // ✅ margen extra arriba del canvas para el primer chart
-  const TOP_PAD = Math.round(H * 0.06); // ✅ más parecido a la foto 2
-  const GAP = Math.round(H * 0.03);     // ✅ separación entre charts (chica)
-
-  // ✅ alturas reales de slots (no uses halfH directo)
-  const availableH = H - TOP_PAD - GAP;
-  const topH = Math.round(availableH * 0.50);
-  const bottomH = availableH - topH;
-
-  // ✅ el slot de arriba ahora es más chico (para no empujar hacia abajo sin control)
-  const topSlotH = Math.max(1, halfH - TOP_PAD);
-
-      const BASE_W = 1920;
-const BASE_H = 1080;
-
-const svgA = chartSvgBuilders[a.chartType]({
-  ...a.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true,
-});
-
-const svgB = chartSvgBuilders[b.chartType]({
-  ...b.args,
-  width: BASE_W,
-  height: BASE_H,
-  isCombinedMode: true,
-});
-
-
- const A = extractInnerSvgWithBounds(svgA);
-  const B = extractInnerSvgWithBounds(svgB);
-
-  const innerA = namespaceSvgIds(A.inner, "c1-");
-  const innerB = namespaceSvgIds(B.inner, "c2-");
-
-  // ✅ calcula escala objetivo común para que “se sientan del mismo tamaño”
-  const fitA = Math.min(W / (A.bounds?.w ?? 1920), topH / (A.bounds?.h ?? 1080));
-  const fitB = Math.min(W / (B.bounds?.w ?? 1920), bottomH / (B.bounds?.h ?? 1080));
-  const commonScale = Math.min(fitA, fitB); // ✅ ambos caben con la misma escala
-
-  const placedA = placeIntoSlot(innerA, A.bounds, W, topH, {
-    allowUpscale: true,
-    maxScale: 1.35,
-    margin: 0.98,           // ✅ súbelo para que no se vea “chiquito”
-    forceScale: commonScale,
-    alignY: "top",          // ✅ respeta margen arriba dentro del slot
-  });
-
-  const placedB = placeIntoSlot(innerB, B.bounds, W, bottomH, {
-    allowUpscale: true,
-    maxScale: 1.35,
-    margin: 0.98,
-    forceScale: commonScale,
-    alignY: "top",
-  });
-
-  const yTop = TOP_PAD;
-  const yBottom = TOP_PAD + topH + GAP;
-
-  return `
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg"
-     width="${W}" height="${H}"
-     viewBox="0 0 ${W} ${H}"
-     preserveAspectRatio="xMidYMid meet"
-     overflow="visible">
-  <rect width="100%" height="100%" fill="${bg}"/>
-  <g transform="translate(0,${yTop})">${placedA}</g>
-  <g transform="translate(0,${yBottom})">${placedB}</g>
-</svg>
-`.trim();
-}
-
-    // --- Poligrama: izquierda/derecha (SIN CAMBIOS) ---
-    const halfW = Math.round(W / 2);
-
-    const svgA = chartSvgBuilders[a.chartType]({
-      ...a.args,
-      width: halfW,
-      height: H,
-      isCombinedMode: true,
-    });
-
-    const svgB = chartSvgBuilders[b.chartType]({
-      ...b.args,
-      width: halfW,
-      height: H,
-      isCombinedMode: true,
-    });
-
-    const innerA = extractInnerSvg(svgA);
-    const innerB = extractInnerSvg(svgB);
-
-    return `
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="${bg}"/>
-  <g transform="translate(0,0)">${innerA}</g>
-  <g transform="translate(${halfW},0)">${innerB}</g>
-</svg>
-`.trim();
-  },
+  combined: buildCombined,
 };

@@ -21,6 +21,7 @@ type BuildNarrowVertBarsSvgArgs = {
   textColor?: string;
   brand?: Brand;
   headerLeftLabel?: string;
+  isCombinedMode?: boolean;
 };
 
 function prepareTitle(
@@ -125,14 +126,15 @@ export function buildNarrowVertBarsSvg({
   backgroundColor,
   textColor,
   brand,
+  isCombinedMode,
   headerLeftLabel = "Monterrey, Nuevo León",
 }: BuildNarrowVertBarsSvgArgs): string {
-  const theme = getBrandTheme(brand ?? "poligrama");
-  const isCensBrand = brand === "censEdmundSinsa";
+   const isCensBrand = brand === "censEdmundSinsa";
 
-  // ✅ misma idea que tus otros exports
-  const W = isCensBrand ? 612 : width ?? 1920;
-  const H = isCensBrand ? 792 : height ?? 1080;
+  const theme = getBrandTheme(brand ?? "poligrama");
+  const W = isCensBrand ? 612 : (width ?? 1920);
+const H = isCensBrand ? 792 : (height ?? 1080);
+
 
   // Para Cens usamos reglas “tall” escaladas desde 1440x1800
   const BASE_W = 1440;
@@ -198,9 +200,21 @@ export function buildNarrowVertBarsSvg({
 
   // ---- Área de barras (vertical) ----
   // Diseño “tipo foto”: mucho aire arriba y barras “desde el baseline”
-  const barsTop = titleY + titleBlockH + S(0);
-  const barsBottom = H - marginBottom - S(400); // deja espacio para labels de abajo
-  const barsH = Math.max(1, barsBottom - barsTop);
+const barsTop = marginTop + S(20)
+
+
+// ✅ reserva REAL para labels (máx 2 líneas) + padding
+const labelGap = S(28);
+const labelFs = useTallRules ? S(24) : 24;
+const maxLabelLines = 2;
+const labelLineGap = S(6);
+const labelsBlockH =
+  labelGap + (maxLabelLines * labelFs) + ((maxLabelLines - 1) * labelLineGap) + S(24);
+
+// ✅ ya no uses S(400)
+const barsBottom = H - marginBottom - labelsBlockH;
+const barsH = Math.max(1, barsBottom - barsTop);
+
 
   // Baseline (donde “nacen” las barras)
   const baselineY = barsBottom;
@@ -217,11 +231,10 @@ export function buildNarrowVertBarsSvg({
   // muy angosta como referencia del PDF
   const barW = Math.max(S(10), Math.min(S(18), slot * 0.18));
   const pctFs = useTallRules ? S(34) : 34;
-  const labelFs = useTallRules ? S(24) : 24;
 
   // separación % arriba y label abajo
   const pctGap = S(12);
-  const labelGap = S(28);
+
 
   const parts: string[] = [];
   parts.push(
@@ -240,6 +253,7 @@ export function buildNarrowVertBarsSvg({
     `<rect width="100%" height="100%" fill="${bg}" />`
   );
 
+parts.push(`<g id="chart-content">`);
   // HEADER
   if (sheetTitle) {
     parts.push(
@@ -262,6 +276,7 @@ export function buildNarrowVertBarsSvg({
   }
 
   // TITLE
+
   titleLines.forEach((line, idx) => {
     const y = titleY + idx * (titleFs + titleLineGapRender);
     parts.push(
@@ -273,7 +288,7 @@ export function buildNarrowVertBarsSvg({
              text-anchor="start">${esc(line)}</text>`
     );
   });
-
+  
   // BARS
   // Opacidades tipo “tonos” sin colores nuevos
   const minOp = 0.25;
@@ -323,6 +338,26 @@ export function buildNarrowVertBarsSvg({
     }
   });
 
-  parts.push(`</svg>`);
+ // ✅ bounds "tight" para combined (corta el margen izquierdo/derecho)
+const contentBottom = Math.min(H, barsBottom + labelsBlockH);
+
+// el dibujo real vive entre plotLeft..plotRight (con un poquito de aire)
+const boundsX = Math.max(0, plotLeft - S(20));
+const boundsRight = Math.min(W, plotRight + S(20));
+const boundsW = Math.max(1, boundsRight - boundsX);
+
+// si estás ocultando header/título, el contenido empieza más abajo
+const boundsY =  Math.max(0, barsTop - S(20)) 
+
+const boundsBottom = Math.min(H, contentBottom);
+const boundsH = Math.max(1, boundsBottom - boundsY);
+
+parts.push(
+  `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}" fill="none" opacity="0" />`,
+  `</g>`,
+  `</svg>`
+);
+
+
   return parts.join("\n");
 }
