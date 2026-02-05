@@ -903,12 +903,15 @@ const placedTop = placeIntoSlot(topPlotInner, topPlotB, outW, topH, {
   alignX: "center",
 });
 
-const placedBottom = placeIntoSlot(bottomPlotInner, bottomPlotB, outW, bottomH, {
+// mismo “margen” que usa el header en la maqueta 1440
+const LEFT_INSET = Math.round(outW * (100 / 1440)); // ~42px en 612
+
+const placedBottom = placeIntoSlot(bottomPlotInner, bottomPlotB, outW - LEFT_INSET, bottomH, {
   allowUpscale: true,
   maxScale: 2.2,
   margin: 1,
   alignY: "top",
-  alignX: "center",
+  alignX: "left",
 });
 
   // Si NO quieres recortes, NO uses clipPaths aquí.
@@ -920,7 +923,7 @@ return `
   <rect width="100%" height="100%" fill="${outBg}"/>
   <g transform="translate(0,${TOP_PAD})">${placedHeader}</g>
   <g transform="translate(0,${TOP_PAD + headerSlotH})">${placedTop}</g>
-  <g transform="translate(0,${TOP_PAD + headerSlotH + topH + GAP})">${placedBottom}</g>
+  <g transform="translate(${LEFT_INSET},${TOP_PAD + headerSlotH + topH + GAP})">${placedBottom}</g>
 </svg>
 `.trim();
 }

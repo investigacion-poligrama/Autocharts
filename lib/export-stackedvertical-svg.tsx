@@ -384,17 +384,21 @@ if (isCensBrand) {
 
   const axisLeft = marginLeft + S(40);
   const barsLeft = axisLeft + S(40);
-  const showRightLegend = Boolean(isCensBrand && isCombinedMode);
 
 // ancho reservado para leyenda (ajústalo)
-const legendW = showRightLegend ? S(260) : 0;
-const legendGapX = showRightLegend ? S(24) : 0;
+const showRightLegend = Boolean(isCensBrand && isCombinedMode);
+
+// ✅ 3 knobs independientes
+const legendW = showRightLegend ? S(320) : 0;          // ancho del bloque leyenda
+const legendGapX = showRightLegend ? S(90) : 0;        // gap entre plot y leyenda
+const legendOuterPad = showRightLegend ? S(70) : 0;    // margen al borde derecho
 
 const barsRight = showRightLegend
-  ? (W - marginRight - legendW - legendGapX)
+  ? (W - marginRight - legendOuterPad - legendW - legendGapX)
   : (W - marginRight);
 
 const barsWidth = barsRight - barsLeft;
+
 
 
   const chartTop = lineY + S(50);
@@ -429,8 +433,12 @@ const chartHeight = chartBottom - chartTop;
 
 
   const monthsCount = months.length;
-  const barSlot = monthsCount > 0 ? barsWidth / monthsCount : 0;
-  const barWidth = barSlot * (isCensBrand ? 0.18 : 0.22);
+const barSlot = monthsCount > 0 ? barsWidth / monthsCount : 0;
+
+// ✅ más gorditas en combined/right-legend, sin pasarse
+const barFactor = showRightLegend ? 0.30 : (isCensBrand ? 0.18 : 0.22);
+const barWidth = Math.max(S(10), Math.min(barSlot * 0.45, barSlot * barFactor));
+
 
   const yMax = 100;
 
@@ -623,10 +631,10 @@ const legendItemHeight = S(24);
 const legendFontSize = isCensBrand ? S(34) : 20;
 
 if (showRightLegend) {
-  // ✅ Leyenda a la derecha, vertical
-  const legendX = barsRight + legendGapX;
+const legendX = barsRight + legendGapX;  // ✅ empieza después del gap real
   const legendY = chartTop;
-  const legendFontSizeR = S(28);
+
+  const legendFontSizeR = S(34); // o S(36) si quieres más
   const squareSizeR = S(18);
   const rowGapR = S(14);
 
@@ -711,8 +719,8 @@ const boundsX = Math.max(0, barsLeft - yAxisLabelPad);
 const rightPad = S(30);
 
 const boundsRight = showRightLegend
-  ? Math.min(W, (barsRight + legendGapX + legendW + rightPad))
-  : Math.min(W, (barsRight + rightPad));
+  ? Math.min(W, barsRight + legendGapX + legendW + legendOuterPad + rightPad)
+  : Math.min(W, barsRight + rightPad);
 
 const boundsW = Math.max(1, boundsRight - boundsX);
 
