@@ -259,6 +259,13 @@ parts.push(`<g id="chart-content">`);
   const rowsH = tableHeight - headerH;
   const rowH = rowsH / safeRowOrder.length;
 
+// ✅ altura máxima de pill (ajústala a tu gusto)
+// en 1920 se seguirá usando rowH-12 (porque suele ser menor)
+// en 1440 se capea y queda igual de “chaparra”
+const pillH = Math.min(rowH - 12, 56); // <- prueba 52–60
+const pillYOffset = (rowH - pillH) / 2;
+
+
   const cols = col2Labels.length;
 
   const contentLeft = marginLeft;
@@ -304,7 +311,10 @@ const pillX = blockLeft + idx * (PILL_W + PILL_GAP);
   });
 
   safeRowOrder.forEach((rowLabel, rowIndex) => {
-    const y = tableTop + headerH + rowIndex * rowH;
+  const rowGapY = isTall ? 14 : 0; // <-- ajusta (10–18)
+  const rowStep = isTall ? (pillH + rowGapY) : rowH;
+  const y = tableTop + headerH + rowIndex * rowStep;
+
 
     const rowBg = customColors[rowLabel] ?? ChartConfig.colors.matrix.medium;
     const textLines = wrapMatrixLabel(rowLabel);
@@ -313,13 +323,13 @@ const labelX = labelPillX; // <- clave
 
 
 parts.push(
-  `<rect x="${labelX}" y="${y + 6}" width="${labelW}"
-    height="${rowH - 12}" rx="10" fill="${rowBg}"/>`
+  `<rect x="${labelX}" y="${y + pillYOffset}" width="${labelW}"
+    height="${pillH}" rx="10" fill="${rowBg}"/>`
 );
 
 
     const centerX = labelX + labelW / 2;
-    const centerY = y + rowH / 2;
+    const centerY = y + pillYOffset + pillH / 2;
 
     if (textLines.length === 1) {
       parts.push(
@@ -350,9 +360,9 @@ parts.push(
 
       
 parts.push(
-  `<rect x="${cellPillX}" y="${y + 6}" width="${PILL_W}" height="${rowH - 12}"
+  `<rect x="${cellPillX}" y="${y + pillYOffset}" width="${PILL_W}" height="${pillH}"
     rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
-  `<text x="${cellPillX + PILL_W / 2}" y="${y + rowH / 2}"
+  `<text x="${cellPillX + PILL_W / 2}" y="${y + pillYOffset + pillH / 2}"
     fill="${mainTextColor}" font-size="20" font-weight="700"
     text-anchor="middle" dominant-baseline="middle"
     font-family="${FONT_STACK}">
