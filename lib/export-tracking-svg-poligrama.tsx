@@ -234,9 +234,10 @@ export function buildTrackingSvg({
   const W = width ?? CANVAS_W;
   const H = height ?? CANVAS_H;
 
+  
+
   const bg = backgroundColor ?? "#000000";
   const mainTextColor = textColor ?? "#ffffff";
-  const mutedTextColor = textColor ?? "#bdbdbd";
 
   const baseTitleFs = ChartConfig.typography.title.fontSize;
   const headerFs = 40;
@@ -276,20 +277,57 @@ export function buildTrackingSvg({
     return basicTrackingMessageSvg("No hay datos (todas las categorías excluidas).");
   }
 
-  const contentTop = lineY + 60;
-  const contentBottom = H - marginBottom - 120;
-  const contentHeight = contentBottom - contentTop;
-
   const shouldHideLegend = !!hideLegend || !!isCombinedMode;
 
 // si NO hay leyenda, no reserves ese ancho
-const legendWidth = shouldHideLegend ? 0 : 420;
 
-// si no hay leyenda, el chart arranca pegado a marginLeft
-const chartX0 = marginLeft + (shouldHideLegend ? 0 : legendWidth + 120);
-  const chartY0 = contentTop;
-  const chartWidth = W - chartX0 - marginRight;
-  const chartHeight = contentHeight;
+const isPortrait = H > W; // o: (H / W) > 1.1
+const legendPosition: "left" | "top" =
+  (!shouldHideLegend && isPortrait) ? "top" : "left";
+
+const contentTopBase = lineY + 60;
+
+// medidas base de pills
+const pillHeight = 80;
+const pillGapY = 25;
+const pillGapX = 16;
+
+// LEFT legend settings
+const legendWidthLeft = 420;
+const legendGapToChart = 120;
+
+// TOP legend settings
+const legendTopGap = 35;     // separación entre título y leyenda
+const legendBottomGap = 35;  // separación entre leyenda y chart
+
+let legendReservedW = 0;
+let legendReservedH = 0;
+
+if (!shouldHideLegend) {
+  if (legendPosition === "left") {
+    legendReservedW = legendWidthLeft + legendGapToChart;
+  } else {
+    // Calcula cuántas filas ocuparán las pills arriba
+    // (3 columnas suele verse bien en 1440px; ajústalo si quieres)
+    const colsTop = 3;
+    const rowsTop = Math.ceil(categories.length / colsTop);
+    legendReservedH =
+      legendTopGap +
+      (rowsTop * pillHeight + (rowsTop - 1) * pillGapY) +
+      legendBottomGap;
+  }
+}
+
+const contentTop = contentTopBase + legendReservedH;
+const contentBottom = H - marginBottom - 120;
+const contentHeight = contentBottom - contentTop;
+
+// chart area
+const chartX0 = marginLeft + legendReservedW;
+const chartY0 = contentTop;
+const chartWidth = W - chartX0 - marginRight;
+const chartHeight = contentHeight;
+
 
   const maxValue = Math.max(10, ...categories.flatMap((c) => c.values));
   const yMax = Math.ceil(maxValue / 10) * 10;
@@ -324,84 +362,96 @@ const chartX0 = marginLeft + (shouldHideLegend ? 0 : legendWidth + 120);
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
 
-    /* -------------------- LEYENDA (pills) -------------------- */
-if (!shouldHideLegend) {  
-  const legendX = marginLeft;
-  const pillCols = 2;
-  const pillGapX = 16;
-  const pillGapY = 25;
-  const pillWidth = ((legendWidth - pillGapX) / pillCols) + 20;
-  const pillHeight = 80;
+/* -------------------- LEYENDA (pills) -------------------- */
+if (!shouldHideLegend) {
+  const legendFs = 22;
+  const maxChars = 18;
 
-  const legendRows = Math.ceil(categories.length / pillCols);
-  const legendTotalHeight =
-    legendRows * pillHeight + (legendRows - 1) * pillGapY;
+  const layoutLeft = () => {
+    const legendX = marginLeft;
+    const pillCols = 2;
+    const pillWidth = ((legendWidthLeft - pillGapX) / pillCols) + 20;
 
-  const legendY = contentTop + (contentHeight - legendTotalHeight) / 2;
+    const legendRows = Math.ceil(categories.length / pillCols);
+    const legendTotalHeight =
+      legendRows * pillHeight + (legendRows - 1) * pillGapY;
 
-  categories.forEach((cat, idx) => {
-    const colIdx = idx % pillCols;
-    const rowIdx = Math.floor(idx / pillCols);
+    // OJO: aquí usamos contentTopBase (NO contentTop),
+    // porque contentTop ya incluye el “reserve” de top-legend.
+    const legendY =
+      contentTopBase + ( (H - marginBottom - 120) - contentTopBase - legendTotalHeight ) / 2;
 
-    const x = legendX + colIdx * (pillWidth + pillGapX);
-    const y = legendY + rowIdx * (pillHeight + pillGapY);
+    drawPills(legendX, legendY, pillCols, pillWidth);
+  };
 
-    const color = colorForProblem(cat.name, customColors);
-    const textFill = isColorLight(color) ? "#000000" : "#ffffff";
+  const layoutTop = () => {
+    const pillCols = 3; // recomendado para 1440px; ajusta si quieres
+    const availableW = W - marginLeft - marginRight;
+    const pillWidth = (availableW - (pillCols - 1) * pillGapX) / pillCols;
 
-    // pill rect
-    parts.push(
-      `<rect x="${x}" y="${y}" width="${pillWidth}" height="${pillHeight}" rx="20" ry="20" fill="${color}" />`
-    );
+    const legendX = marginLeft;
+    const legendY = contentTopBase + legendTopGap;
 
-    // texto del pill, con wrap a 2 líneas
-    const legendFs = 22;
-    const maxChars = 18;
-    const cx = x + pillWidth / 2;
-    const cy = y + pillHeight / 2;
+    drawPills(legendX, legendY, pillCols, pillWidth);
+  };
 
-    const words = cat.name.split(/\s+/);
-    let lines: string[] = [];
-    let current = "";
+  const drawPills = (legendX: number, legendY: number, pillCols: number, pillWidth: number) => {
+    categories.forEach((cat, idx) => {
+      const colIdx = idx % pillCols;
+      const rowIdx = Math.floor(idx / pillCols);
 
-    for (const w of words) {
-      const test = current ? current + " " + w : w;
-      if (test.length > maxChars && current) {
-        lines.push(current);
-        current = w;
-      } else {
-        current = test;
+      const x = legendX + colIdx * (pillWidth + pillGapX);
+      const y = legendY + rowIdx * (pillHeight + pillGapY);
+
+      const color = colorForProblem(cat.name, customColors);
+      const textFill = isColorLight(color) ? "#000000" : "#ffffff";
+
+      parts.push(
+        `<rect x="${x}" y="${y}" width="${pillWidth}" height="${pillHeight}" rx="20" ry="20" fill="${color}" />`
+      );
+
+      // wrap a 2 líneas
+      const cx = x + pillWidth / 2;
+      const cy = y + pillHeight / 2;
+
+      const words = cat.name.split(/\s+/);
+      let lines: string[] = [];
+      let current = "";
+
+      for (const w of words) {
+        const test = current ? current + " " + w : w;
+        if (test.length > maxChars && current) {
+          lines.push(current);
+          current = w;
+        } else {
+          current = test;
+        }
       }
-    }
-    if (current) lines.push(current);
+      if (current) lines.push(current);
+      if (lines.length > 2) lines = [lines[0], lines.slice(1).join(" ")];
 
-    if (lines.length > 2) {
-      lines = [lines[0], lines.slice(1).join(" ")];
-    }
+      const lineGap = 2;
+      const firstLineY = cy - ((lines.length - 1) * (legendFs + lineGap)) / 2;
 
-    const lineGap = 2;
-    const firstLineY =
-      cy - ((lines.length - 1) * (legendFs + lineGap)) / 2;
-
-    parts.push(
-      `<text x="${cx}" y="${firstLineY}"
-        fill="${textFill}"
-        font-family="Helvetica, Arial, sans-serif"
-        font-size="${legendFs}"
-        font-weight="700"
-        text-anchor="middle">` +
-        lines
-          .map(
-            (line, idx2) =>
-              `<tspan x="${cx}" dy="${
-                idx2 === 0 ? 0 : legendFs + lineGap
-              }">${esc(line)}</tspan>`
-          )
-          .join("") +
+      parts.push(
+        `<text x="${cx}" y="${firstLineY}"
+          fill="${textFill}"
+          font-family="Helvetica, Arial, sans-serif"
+          font-size="${legendFs}"
+          font-weight="700"
+          text-anchor="middle">` +
+          lines.map((line, idx2) =>
+            `<tspan x="${cx}" dy="${idx2 === 0 ? 0 : legendFs + lineGap}">${esc(line)}</tspan>`
+          ).join("") +
         `</text>`
-    );
-  });
+      );
+    });
+  };
+
+  if (legendPosition === "left") layoutLeft();
+  else layoutTop();
 }
+
 
   parts.push(`<g id="chart-content">`);
 
