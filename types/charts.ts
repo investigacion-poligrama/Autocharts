@@ -1,4 +1,3 @@
-// types/charts.ts
 export type ChartType =
   | "donut"
   | "bar"
@@ -22,6 +21,13 @@ export interface DatasetColumn {
   name: string;
   values: string[];
 }
+export type SavedChart = {
+  id: string;
+  createdAt: number;
+  title: string;
+  chartType: ChartType;
+  svg: string;
+};
 
 export interface FrequencyData {
   label: string;

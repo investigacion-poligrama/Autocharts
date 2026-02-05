@@ -259,28 +259,33 @@ parts.push(`<g id="chart-content">`);
   const rowsH = tableHeight - headerH;
   const rowH = rowsH / safeRowOrder.length;
 
-  const labelColW = 280;
-  const dataW = W - marginLeft - marginRight - labelColW;
-  const shrinkX = 0.78;
-  const PILL_W = (labelColW - 16) * shrinkX; 
-  const PILL_GAP = 20; // prueba 12–32
   const cols = col2Labels.length;
 
-// ancho total del grupo de % (header/columnas)
-const colsBlockW = cols * PILL_W + (cols - 1) * PILL_GAP;
+  const contentLeft = marginLeft;
+  const contentW = W - marginLeft - marginRight;
 
-// ancho total de TODA la matriz (label + gap + columnas)
-const fullBlockW = PILL_W + PILL_GAP + colsBlockW;
+  // Gap adaptativo (puedes ajustar min/max)
+  const PILL_GAP = isTall ? 16 : 20;
 
-// centrado en el canvas (entre margins)
-const contentLeft = marginLeft;
-const contentW = W - marginLeft - marginRight;
-const fullLeft = contentLeft + (contentW - fullBlockW) / 2;
+  // "Target" (tu look actual)
+  const shrinkX = 0.78;
+  const labelColW = 280;
+  const targetPillW = (labelColW - 16) * shrinkX;
 
-// posiciones X finales
-const labelPillX = fullLeft;
-const blockLeft = labelPillX + PILL_W + PILL_GAP;
+  // ✅ ancho máximo permitido para que QUEPA: (cols+1) pills + cols gaps
+  const maxPillW = (contentW - cols * PILL_GAP) / (cols + 1);
 
+  // ✅ pill width final (no crece en 1920, pero sí se achica en 1440 si hace falta)
+  const PILL_W = Math.max(120, Math.min(targetPillW, maxPillW)); // 120 = mínimo legible (ajústalo)
+
+  const colsBlockW = cols * PILL_W + (cols - 1) * PILL_GAP;
+  const fullBlockW = (cols + 1) * PILL_W + cols * PILL_GAP;
+
+  // centrado perfecto
+  const fullLeft = contentLeft + (contentW - fullBlockW) / 2;
+
+  const labelPillX = fullLeft;
+  const blockLeft = labelPillX + PILL_W + PILL_GAP;
 
 
   col2Labels.forEach((label, idx) => {
