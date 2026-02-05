@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { DatasetColumn, FrequencyData, ChartType } from "@/app/page";
+import type { DatasetColumn, FrequencyData, ChartType } from "@/types/charts";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -134,15 +134,20 @@ export function ColumnSelector({
     useState<RangePickerTarget | null>(null);
 
   const availableColors: Record<string, string> = {
-    Si: "#01793B",
-    No: "#e10814",
-    Neutral: "#9d9d9c",
-    Algoefectivo: "#63c26d",
-    Pocoefectivo: "#c37171",
-    Nadaefectivo: "#a93838",
-    PAN: "#1161d7",
+    MuyBuena_Si: "#00a651",
+    Buena: "#72c478",
+    Regular: "#c37171",
+    Mala: "#a93838",
+    MuyMala_no: "#e10814",
+    PRI: "#036834",
+    PAN: "#1261d6",
+    PT: "#ff0000",
     MC: "#fa8500",
-    VIDA: "#0b2b3f",
+    MORENA: "#b3251e",
+    PVEM: "#03ff7b",
+    VIDA: "#1b8fd0",
+    Ninguno: "#485470",
+    NS: "#9d9d9c",
     Hombre: "#2d3182",
     Mujer: "#dc0180",
     Poligrama: "#9fff6a",
