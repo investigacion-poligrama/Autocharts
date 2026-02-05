@@ -1,6 +1,6 @@
 import { ChartConfig } from "@/lib/chartconfig";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
-import type { DatasetColumn } from "@/app/page";
+import type { DatasetColumn } from "@/types/charts";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;

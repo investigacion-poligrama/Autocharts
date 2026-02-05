@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Download } from "lucide-react";
-import type { ChartType, FrequencyData, DatasetColumn } from "@/app/page";
+import type { ChartType, FrequencyData, DatasetColumn } from "@/types/charts";
 import PreviewFrame from "@/components/ui/preview-frame";
 import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";

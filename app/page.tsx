@@ -8,46 +8,14 @@ import { ChartTypeSelector } from "@/components/chart-type-selector";
 import ChartPreview from "@/components/chart-preview";
 import { GoogleAuth } from "@/components/google-auth";
 import { DragList } from "@/components/ui/draglist";
-
 import { calculateRawFrequencies, parseSpreadsheetId } from "@/lib/frequencies";
-import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
 import { getBrandTheme } from "@/lib/brand-theme";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
 import { parseA1Range, a1ToRowCol } from "@/lib/Summary/a1";
+import type { ChartType, FrequencyData, DatasetColumn } from "@/types/charts";
 
-
-
-export type ChartType =
-  | "donut"
-  | "bar"
-  | "matrix"
-  | "score"
-  | "approval"
-  | "partido"
-  | "tracking"
-  | "stacked"
-  | "mediumdonut"
-  | "barnarrow"
-  | "stackedvertical"
-  | "narrowvertbars"
-  | "combined"
-  | "mikebar"
-  |  "trackingpills"
-  | "table"
-  | "singletrack";
-
-export interface DatasetColumn {
-  name: string;
-  values: string[];
-}
-
-export interface FrequencyData {
-  label: string;
-  value: number;
-  percentage: number;
-}
 
 type InputMode = "raw" | "summary";
 
@@ -292,50 +260,62 @@ export default function Home() {
 
   setCombineMode(true);
 };
-  const handleSaveCombined = () => {
+const handleSaveCombined = async () => {
   if (!firstChartForCombine) return;
 
   const combinedArgs: ChartSvgArgs = {
-  data: [],
-  title: "combined",
-  width: canvasWidth,
-  height: canvasHeight,
-  backgroundColor: previewBg,
-  textColor: previewTextColor,
-  sheetTitle: selectedSheet,
-  combinedCharts: [
-    firstChartForCombine,
-    {
-      chartType,
-      args: {
-        data: dataForChart,
+    data: [],
+    title: "combined",
+    width: canvasWidth,
+    height: canvasHeight,
+    backgroundColor: previewBg,
+    textColor: previewTextColor,
+    sheetTitle: selectedSheet,
+    combinedCharts: [
+      firstChartForCombine,
+      {
+        chartType,
+        args: {
+          data: dataForChart,
+          title: selectedColumn,
+          secondColumn: selectedSecondColumn,
+          columns,
+          customColors,
+          stackedColumns,
+          sheetTitle: selectedSheet,
+          width: canvasWidth,
+          height: canvasHeight,
+          inputMode,
+          labelOrder,
+          matrixRowOrder,
+          sheetValues,
+          stackedLabelCells,
+          stackedRangesSummary,
+          answerRange,
+          backgroundColor: previewBg,
+          textColor: previewTextColor,
+          secondAnswerRange,
+          brand: brand ?? "poligrama",
+          questionCell,
+        },
         title: selectedColumn,
-        secondColumn: selectedSecondColumn,
-        columns,
-        customColors,
-        stackedColumns,
-        sheetTitle: selectedSheet,
-        width: canvasWidth,
-        height: canvasHeight,
-        inputMode,
-        labelOrder,
-        matrixRowOrder,
-        sheetValues,
-        stackedLabelCells,
-        stackedRangesSummary,
-        answerRange,
-        backgroundColor: previewBg,
-        textColor: previewTextColor,
-        secondAnswerRange,
-        brand: brand ?? "poligrama",
-        questionCell,
       },
-      title: selectedColumn,
-    },
-  ],
-};
+    ],
+  };
 
-  const svg = chartSvgBuilders["combined"](combinedArgs);
+  const res = await fetch("/api/render", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chartType: "combined", args: combinedArgs }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert(err?.error ?? "Error renderizando combinado");
+    return;
+  }
+
+  const svg = await res.text();
 
   addChart({
     title: `${firstChartForCombine.title} + ${selectedColumn}`,
@@ -346,6 +326,7 @@ export default function Home() {
   setFirstChartForCombine(null);
   setCombineMode(false);
 };
+
 
 
   const handleBrandSelect = (b: Brand) => {
@@ -638,52 +619,63 @@ export default function Home() {
 
   const labelOrder = useMemo(() => dataForChart.map((f) => f.label), [dataForChart]);
 
-  const handleAddToQueue = () => {
-    if (!selectedColumn) return;
+  const handleAddToQueue = async () => {
+  if (!selectedColumn) return;
 
-    if (chartType === "stacked") {
-      if (inputMode === "raw") {
-        if (!stackedColumns.length) return;
-      } else {
-        if (!stackedRangesSummary.trim()) return;
-      }
+  if (chartType === "stacked") {
+    if (inputMode === "raw") {
+      if (!stackedColumns.length) return;
     } else {
-      if (dataForChart.length === 0) return;
+      if (!stackedRangesSummary.trim()) return;
     }
+  } else {
+    if (dataForChart.length === 0) return;
+  }
 
-    const builder = chartSvgBuilders[chartType];
-    if (!builder) return;
-
-    const svg = builder({
-      data: dataForChart,
-      title: selectedColumn,
-      secondColumn: selectedSecondColumn,
-      columns,
-      customColors,
-      stackedColumns,
-      sheetTitle: selectedSheet,
-      width: canvasWidth,
-      height: canvasHeight,
-      inputMode,
-      labelOrder,
-      matrixRowOrder, 
-      sheetValues,
-      stackedLabelCells,
-      stackedRangesSummary,
-      answerRange,
-      backgroundColor: previewBg,
-      textColor: previewTextColor,
-      secondAnswerRange,
-      brand: brand ?? "poligrama",
-      questionCell,
-    });
-
-    addChart({
-      title: selectedColumn,
-      chartType,
-      svg,
-    });
+  const args: ChartSvgArgs = {
+    data: dataForChart,
+    title: selectedColumn,
+    secondColumn: selectedSecondColumn,
+    columns,
+    customColors,
+    stackedColumns,
+    sheetTitle: selectedSheet,
+    width: canvasWidth,
+    height: canvasHeight,
+    inputMode,
+    labelOrder,
+    matrixRowOrder,
+    sheetValues,
+    stackedLabelCells,
+    stackedRangesSummary,
+    answerRange,
+    backgroundColor: previewBg,
+    textColor: previewTextColor,
+    secondAnswerRange,
+    brand: brand ?? "poligrama",
+    questionCell,
   };
+
+  const res = await fetch("/api/render", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chartType, args }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert(err?.error ?? "Error renderizando");
+    return;
+  }
+
+  const svg = await res.text();
+
+  addChart({
+    title: selectedColumn,
+    chartType,
+    svg,
+  });
+};
 
   const canShowPreview = useMemo(() => {
     if (!selectedColumn) return false;

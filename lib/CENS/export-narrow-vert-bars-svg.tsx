@@ -1,4 +1,4 @@
-import type { FrequencyData } from "@/app/page";
+import type { FrequencyData } from "@/types/charts";
 import { getBrandTheme } from "@/lib/brand-theme";
 import { COOLVETICA_WOFF2_BASE64 } from "@/coolvetica.b64";
 import type { Brand } from "@/types/brand";

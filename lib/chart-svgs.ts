@@ -1,7 +1,6 @@
 // lib/chart-svgs.ts
-import type { ChartType, FrequencyData, DatasetColumn } from "@/app/page";
+import type { ChartType, FrequencyData, DatasetColumn } from "@/types/charts";
 import type { Brand } from "@/types/brand";
-
 import { buildDonutSvg } from "@/lib/POLIGRAMA/export-donut-svg-poligrama";
 import { buildBarSvg } from "@/lib/POLIGRAMA/export-bar-svg-poligrama";
 import { buildMatrixSvg } from "@/lib/POLIGRAMA/export-matrix-svg-poligrama";
