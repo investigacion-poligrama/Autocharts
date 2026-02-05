@@ -8,6 +8,7 @@ import PreviewFrame from "@/components/ui/preview-frame";
 import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
+import type { ChartSvgArgs } from "@/lib/chart-svgs";
 
 interface ChartPreviewProps {
   chartType: ChartType;
@@ -73,13 +74,38 @@ export default function ChartPreview({
   onStartCombine,
   onSaveCombined,
   onCancelCombine,
-  
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgMarkup, setSvgMarkup] = useState<string>("");
-  const { addChart } = useExportQueue();
+  const { addChart } = useExportQueue(); // (no lo usas aquí, pero lo dejo igual)
   const isCens = brand === "censEdmundSinsa";
+
+  // ✅ Centraliza args (preview + export)
+  const makeChartArgs = (): ChartSvgArgs => ({
+    data,
+    title,
+    secondColumn,
+    columns,
+    customColors,
+    stackedColumns,
+    sheetTitle,
+    width: canvasWidth,
+    height: canvasHeight,
+    inputMode,
+    labelOrder,
+    sheetValues,
+    stackedLabelCells,
+    stackedRangesSummary,
+    answerRange,
+    questionCell,
+    matrixRowOrder,
+    // OJO: requiere que ChartSvgArgs ya tenga esta prop (como vimos en el error TS)
+    secondAnswerRange,
+    backgroundColor: previewBg?.trim() ? previewBg : undefined,
+    textColor: previewTextColor?.trim() ? previewTextColor : undefined,
+    brand: brand ?? "poligrama",
+  });
 
   useEffect(() => {
     const builder = chartSvgBuilders[chartType];
@@ -88,30 +114,7 @@ export default function ChartPreview({
       return;
     }
 
-    const svg = builder({
-      data,
-      title,
-      secondColumn,
-      columns,
-      customColors,
-      stackedColumns,
-      sheetTitle,
-      width: canvasWidth,
-      height: canvasHeight,
-      inputMode,
-      labelOrder,
-      secondAnswerRange,
-      sheetValues,
-      stackedLabelCells,
-      stackedRangesSummary,
-      answerRange,
-      questionCell,
-      matrixRowOrder,
-      backgroundColor: previewBg?.trim() ? previewBg : undefined,
-      textColor: previewTextColor?.trim() ? previewTextColor : undefined,
-      brand: brand ?? "poligrama",
-    });
-
+    const svg = builder(makeChartArgs());
     setSvgMarkup(svg);
   }, [
     chartType,
@@ -147,29 +150,7 @@ export default function ChartPreview({
 
     setIsExporting(true);
     try {
-      const svg = builder({
-        data,
-        title,
-        secondColumn,
-        columns,
-        customColors,
-        stackedColumns,
-        sheetTitle,
-        width: canvasWidth,
-        height: canvasHeight,
-        inputMode,
-        labelOrder,
-        stackedLabelCells,
-        stackedRangesSummary,
-        answerRange,
-        questionCell,
-        backgroundColor: previewBg?.trim() ? previewBg : undefined,
-        textColor: previewTextColor?.trim() ? previewTextColor : undefined,   
-        sheetValues,
-        secondAnswerRange,
-        brand: brand ?? "poligrama",
-        matrixRowOrder,
-      });
+      const svg = builder(makeChartArgs());
 
       const blob = new Blob([svg], {
         type: "image/svg+xml;charset=utf-8",
@@ -223,21 +204,21 @@ export default function ChartPreview({
           </Button>
 
           {!isCombineMode && (
-  <Button variant="outline" size="sm" onClick={onStartCombine}>
-    Combinar
-  </Button>
-)}
+            <Button variant="outline" size="sm" onClick={onStartCombine}>
+              Combinar
+            </Button>
+          )}
 
-{isCombineMode && (
-  <>
-    <Button variant="outline" size="sm" onClick={onCancelCombine}>
-      Cancelar
-    </Button>
-    <Button variant="default" size="sm" onClick={onSaveCombined}>
-      Guardar combinado
-    </Button>
-  </>
-)}
+          {isCombineMode && (
+            <>
+              <Button variant="outline" size="sm" onClick={onCancelCombine}>
+                Cancelar
+              </Button>
+              <Button variant="default" size="sm" onClick={onSaveCombined}>
+                Guardar combinado
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

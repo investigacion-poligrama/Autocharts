@@ -2,33 +2,45 @@
 import type { ChartType, FrequencyData, DatasetColumn } from "@/app/page";
 import type { Brand } from "@/types/brand";
 
-import { buildDonutSvg } from "@/lib/export-donut-svg-poligrama";
-import { buildBarSvg } from "@/lib/export-bar-svg-poligrama";
-import { buildMatrixSvg } from "@/lib/export-matrix-svg-poligrama";
-import { buildScoreSvg } from "@/lib/export-score-svg-poligrama";
-import { buildApprovalSvg } from "@/lib/export-approval-svg-poligrama";
-import { buildPartidoSvg } from "@/lib/export-partido-svg-poligrama";
-import { buildTrackingSvg } from "@/lib/export-tracking-svg-poligrama";
-import { buildMediumDonutSvg } from "@/lib/export-mediumdonut-svg-poligrama";
+import { buildDonutSvg } from "@/lib/POLIGRAMA/export-donut-svg-poligrama";
+import { buildBarSvg } from "@/lib/POLIGRAMA/export-bar-svg-poligrama";
+import { buildMatrixSvg } from "@/lib/POLIGRAMA/export-matrix-svg-poligrama";
+import { buildScoreSvg } from "@/lib/POLIGRAMA/export-score-svg-poligrama";
+import { buildApprovalSvg } from "@/lib/POLIGRAMA/export-approval-svg-poligrama";
+import { buildPartidoSvg } from "@/lib/POLIGRAMA/export-partido-svg-poligrama";
+import { buildTrackingSvg } from "@/lib/POLIGRAMA/export-tracking-svg-poligrama";
+import { buildMediumDonutSvg } from "@/lib/POLIGRAMA/export-mediumdonut-svg-poligrama";
 
 import {
   buildStackedBarSvg,
   StackedRow,
-  StackedSegment,
-} from "@/lib/export-stackedbar-svg-poligrama";
+} from "@/lib/POLIGRAMA/export-stackedbar-svg-poligrama";
 
-import { buildStackedVerticalSvg } from "@/lib/export-stackedvertical-svg";
+import { buildStackedVerticalSvg } from "@/lib/CENS/export-stackedvertical-svg";
 
-import { buildBarNarrowSvg } from "./export-narrow-bar-svg";
-import { buildScoreTrackingCensSvg } from "./export-single-track-svg";
-import { buildNarrowVertBarsSvg } from "./export-narrow-vert-bars-svg";
+import { buildBarNarrowSvg } from "./CENS/export-narrow-bar-svg";
+import { buildScoreTrackingCensSvg } from "./CENS/export-single-track-svg";
+import { buildNarrowVertBarsSvg } from "./CENS/export-narrow-vert-bars-svg";
 
-import { MikebuildBarSvg } from "./export-bar-mikeflores";
+import { MikebuildBarSvg } from "./MIKE/export-bar-mikeflores";
 import { getBrandTheme } from "@/lib/brand-theme";
-import { buildTrackingMikeFloresSvg } from "./export-tracking-mike-flores";
-import { buildTrackingWithPillsMikeFloresSvg } from "./export-trackingwpills-mikeflores";
-import { buildTableMikeFloresSvg } from "./export-table-mikeflores";
-import { buildDonutMikeFloresSvg } from "./export-donut-mikeflores";
+import { buildTrackingMikeFloresSvg } from "./MIKE/export-tracking-mike-flores";
+import { buildTrackingWithPillsMikeFloresSvg } from "./MIKE/export-trackingwpills-mikeflores";
+import { buildTableMikeFloresSvg } from "./MIKE/export-table-mikeflores";
+import { buildDonutMikeFloresSvg } from "./MIKE/export-donut-mikeflores";
+
+import {
+  svgWrapper,
+  extractGroup,
+  extractInnerSvg,
+  extractInnerSvgWithBounds,
+  namespaceSvgIds,
+  placeIntoSlot,
+  extractRectBoundsFromFragment,
+  BASE_BOUNDS,
+} from "@/lib/SVG/compose";
+
+import { makeStackedRows } from "@/lib/Summary/stacked";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -58,6 +70,7 @@ export interface ChartSvgArgs {
 
   // stacked (raw)
   stackedColumns?: string[];
+  secondAnswerRange?: string;
 
   // stacked (summary)
   stackedLabelCells?: string;
@@ -89,456 +102,13 @@ export type ChartSvgBuilder = (args: ChartSvgArgs) => string;
 /* Small utils                                                        */
 /* ------------------------------------------------------------------ */
 
-const BASE_BOUNDS = { x: 0, y: 0, w: 1920, h: 1080 };
-
-const esc = (s: string) =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 function isDeskoverBrand(a?: Brand) {
   return a === "deskover";
-}
-
-function parsePercent(raw: unknown): number {
-  if (raw == null) return NaN;
-
-  let s = String(raw).trim();
-  if (!s) return NaN;
-
-  s = s.replace("%", "").replace(",", ".");
-  let n = Number(s);
-  if (Number.isNaN(n)) return NaN;
-
-  // si viene en 0–1, conviértelo a 0–100
-  if (n <= 1) n = n * 100;
-
-  return Number(n.toFixed(1));
-}
-
-/* ------------------------------------------------------------------ */
-/* SVG Extraction / Bounds                                             */
-/* ------------------------------------------------------------------ */
-
-type SvgBounds = { x: number; y: number; w: number; h: number };
-type ExtractedSvg = { inner: string; bounds: SvgBounds | null };
-
-function getFallbackBoundsFromSvg(svg: string): SvgBounds | null {
-  const vbMatch = svg.match(/viewBox="([^"]+)"/i);
-  if (vbMatch) {
-    const nums = vbMatch[1].trim().split(/\s+/).map(Number);
-    if (nums.length === 4 && nums.every(Number.isFinite)) {
-      const [, , w, h] = nums;
-      if (w > 0 && h > 0) return { x: 0, y: 0, w, h };
-    }
-  }
-
-  const wMatch = svg.match(/\bwidth="([^"]+)"/i);
-  const hMatch = svg.match(/\bheight="([^"]+)"/i);
-  const w = wMatch ? Number(String(wMatch[1]).replace(/[^\d.]/g, "")) : NaN;
-  const h = hMatch ? Number(String(hMatch[1]).replace(/[^\d.]/g, "")) : NaN;
-  if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-    return { x: 0, y: 0, w, h };
-  }
-
-  return null;
-}
-
-/**
- * Extrae el contenido dentro de <g id="chart-content"> ... </g>
- * y opcionalmente el rect id="content-bounds".
- * Si no existe <g id="chart-content">, hace fallback a “inner sin wrapper”.
- */
-
-function extractGroup(svg: string, groupId: string): string {
-  const reStart = new RegExp(`<g[^>]*id="${groupId}"[^>]*>`, "i");
-  const gStart = svg.search(reStart);
-  if (gStart === -1) return "";
-
-  const openTagMatch = svg.slice(gStart).match(reStart);
-  if (!openTagMatch) return "";
-
-  const openTag = openTagMatch[0];
-  const contentStart = gStart + openTag.length;
-
-  let depth = 1;
-  const re = /<\/?g\b[^>]*>/gi;
-  re.lastIndex = contentStart;
-
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(svg))) {
-    const tag = match[0];
-    if (tag.startsWith("</")) depth--;
-    else depth++;
-
-    if (depth === 0) {
-      const contentEnd = match.index;
-      return svg.slice(contentStart, contentEnd);
-    }
-  }
-  return "";
-}
-
-function extractRectBoundsFromFragment(fragment: string, rectId: string): SvgBounds | null {
-  const re = new RegExp(`<rect[^>]*id="${rectId}"[^>]*>`, "i");
-  const m = fragment.match(re);
-  if (!m) return null;
-
-  const rect = m[0];
-  const getNum = (attr: string) => {
-    const mm = rect.match(new RegExp(`${attr}="([^"]+)"`, "i"));
-    return mm ? Number(mm[1]) : NaN;
-  };
-
-  const x = getNum("x");
-  const y = getNum("y");
-  const w = getNum("width");
-  const h = getNum("height");
-
-  if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) return null;
-  return { x, y, w, h };
-}
-
-function extractChartContent(svg: string, wantBounds: boolean): ExtractedSvg {
-  const gStart = svg.search(/<g[^>]*id="chart-content"[^>]*>/i);
-
-  // Fallback: quita wrapper <svg> y rect full background
-  if (gStart === -1) {
-    const inner = svg
-      .replace(/^[\s\S]*?<svg[^>]*>/i, "")
-      .replace(/<\/svg>\s*$/i, "")
-      .replace(/<rect[^>]*width="100%"[^>]*height="100%"[^>]*\/?>/i, "");
-
-    return { inner, bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
-  }
-
-  const openTagMatch = svg.slice(gStart).match(/<g[^>]*id="chart-content"[^>]*>/i);
-  if (!openTagMatch) {
-    return { inner: "", bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
-  }
-
-  const openTag = openTagMatch[0];
-  const contentStart = gStart + openTag.length;
-
-  // Encontrar cierre correcto del </g> con depth
-  let depth = 1;
-  const re = /<\/?g\b[^>]*>/gi;
-  re.lastIndex = contentStart;
-
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(svg))) {
-    const tag = match[0];
-    if (tag.startsWith("</")) depth--;
-    else depth++;
-
-    if (depth === 0) {
-      const contentEnd = match.index;
-      const inner = svg.slice(contentStart, contentEnd);
-
-      if (!wantBounds) return { inner, bounds: null };
-
-      // 1) busca content-bounds dentro del inner
-      const rectMatch = inner.match(/<rect[^>]*id="content-bounds"[^>]*>/i);
-      if (!rectMatch) {
-        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
-      }
-
-      const rect = rectMatch[0];
-      const getNum = (attr: string) => {
-        const m = rect.match(new RegExp(`${attr}="([^"]+)"`, "i"));
-        return m ? Number(m[1]) : NaN;
-      };
-
-      const x = getNum("x");
-      const y = getNum("y");
-      const w = getNum("width");
-      const h = getNum("height");
-
-      if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) {
-        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
-      }
-
-      return { inner, bounds: { x, y, w, h } };
-    }
-  }
-
-  return { inner: "", bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
-}
-
-function extractInnerSvg(svg: string) {
-  return extractChartContent(svg, false).inner;
-}
-
-function extractInnerSvgWithBounds(svg: string) {
-  return extractChartContent(svg, true);
-}
-
-function namespaceSvgIds(fragment: string, prefix: string) {
-  if (!fragment) return fragment;
-
-  const ids = new Set<string>();
-  fragment.replace(/\bid="([^"]+)"/g, (_m, id) => {
-    ids.add(id);
-    return _m;
-  });
-
-  let out = fragment;
-  ids.forEach((id) => {
-    const nid = `${prefix}${id}`;
-    out = out.replace(new RegExp(`\\bid="${id}"`, "g"), `id="${nid}"`);
-    out = out.replace(new RegExp(`url\\(#${id}\\)`, "g"), `url(#${nid})`);
-    out = out.replace(new RegExp(`\\bhref="#${id}"`, "g"), `href="#${nid}"`);
-    out = out.replace(new RegExp(`\\bxlink:href="#${id}"`, "g"), `xlink:href="#${nid}"`);
-  });
-
-  return out;
-}
-
-function placeIntoSlot(
-  inner: string,
-  bounds: SvgBounds | null,
-  slotW: number,
-  slotH: number,
-  opts?: {
-    allowUpscale?: boolean;
-    maxScale?: number;
-    margin?: number;
-    forceScale?: number;
-    alignY?: "center" | "top";
-      alignX?: "center" | "left";   
-  }
-) {
-  const b = bounds ?? BASE_BOUNDS;
-
-  const fitScale = Math.min(slotW / b.w, slotH / b.h);
-  const allowUpscale = opts?.allowUpscale ?? false;
-  const maxScale = opts?.maxScale ?? 1.35;
-  const margin = opts?.margin ?? 0.96;
-
-  const baseScale =
-    typeof opts?.forceScale === "number"
-      ? Math.min(opts.forceScale, fitScale)
-      : allowUpscale
-      ? Math.min(maxScale, fitScale)
-      : Math.min(1, fitScale);
-
-  const s = baseScale * margin;
-
-  const scaledW = b.w * s;
-  const scaledH = b.h * s;
-const alignX = opts?.alignX ?? "center";
-const dx = alignX === "left" ? 0 : (slotW - scaledW) / 2;
-
-  const alignY = opts?.alignY ?? "center";
-  const dy = alignY === "top" ? 0 : (slotH - scaledH) / 2;
-
-  return `
-    <g transform="translate(${dx},${dy}) scale(${s}) translate(${-b.x},${-b.y})">
-      ${inner}
-    </g>
-  `.trim();
-}
-
-/* ------------------------------------------------------------------ */
-/* Stacked RAW                                                        */
-/* ------------------------------------------------------------------ */
-
-function makeStackedRowsRaw({
-  columns = [],
-  stackedColumns = [],
-  labelOrder = [],
-}: ChartSvgArgs): StackedRow[] {
-  if (!stackedColumns.length) return [];
-
-  let categories: string[] = [];
-
-  if (labelOrder.length > 0) {
-    categories = [...labelOrder];
-  } else {
-    const firstCol = columns.find((c) => c.name === stackedColumns[0]);
-    if (!firstCol) return [];
-    categories = Array.from(new Set(firstCol.values.filter((v) => v && v !== "")));
-  }
-
-  const makeRawSegments = (questionCol: DatasetColumn) => {
-    const counts: Record<string, number> = {};
-    let total = 0;
-
-    questionCol.values.forEach((v) => {
-      if (!v) return;
-      counts[v] = (counts[v] || 0) + 1;
-      total++;
-    });
-
-    return categories.map((cat) => {
-      const c = counts[cat] || 0;
-      const pct = total > 0 ? Number(((c / total) * 100).toFixed(1)) : 0;
-      return { label: cat, percentage: pct };
-    });
-  };
-
-  return stackedColumns
-    .map((colName) => {
-      const colIndex = columns.findIndex((c) => c.name === colName);
-      if (colIndex === -1) return null;
-
-      const questionCol = columns[colIndex];
-
-      // intenta usar columna % al lado (si parece porcentaje)
-      let percentCol: DatasetColumn | undefined;
-      const candidate = columns[colIndex + 1];
-
-      if (candidate) {
-        const nameLooksLikePercent = /porcentaje/i.test(candidate.name);
-        const hasNumeric = candidate.values.some((v) => !Number.isNaN(parsePercent(v)));
-        if (nameLooksLikePercent || hasNumeric) percentCol = candidate;
-      }
-
-      if (!percentCol) {
-        return { label: colName, segments: makeRawSegments(questionCol) };
-      }
-
-      const segments = categories.map((cat) => {
-        const rowIdx = questionCol.values.findIndex((v) => v === cat);
-        const rawPct = rowIdx === -1 ? NaN : parsePercent(percentCol!.values[rowIdx]);
-        return { label: cat, percentage: Number((rawPct || 0).toFixed(1)) };
-      });
-
-      return { label: colName, segments };
-    })
-    .filter(Boolean) as StackedRow[];
-}
-
-/* ------------------------------------------------------------------ */
-/* Stacked SUMMARY (A1)                                                */
-/* ------------------------------------------------------------------ */
-
-function a1ToRowColSummary(a1: string) {
-  const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
-  if (!match) throw new Error(`Referencia A1 inválida: ${a1}`);
-
-  const [, colLetters, rowStr] = match;
-  let col = 0;
-  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
-
-  const row = parseInt(rowStr, 10);
-  if (!row || row < 1) throw new Error(`Fila inválida en referencia A1: ${a1}`);
-
-  return { row, col }; // 1-based
-}
-
-function parseA1RangeSummary(range: string) {
-  const [startStr, endStr] = range.split(":");
-  const start = a1ToRowColSummary(startStr);
-  const end = endStr ? a1ToRowColSummary(endStr) : start;
-
-  return {
-    rowStart: Math.min(start.row, end.row),
-    rowEnd: Math.max(start.row, end.row),
-    colStart: Math.min(start.col, end.col),
-    colEnd: Math.max(start.col, end.col),
-  };
-}
-
-function buildSummarySegmentsFromRange(values: any[][], range: string): StackedSegment[] {
-  const trimmed = range.trim();
-  if (!trimmed) return [];
-
-  let parsed;
-  try {
-    parsed = parseA1RangeSummary(trimmed);
-  } catch (err) {
-    console.warn("Rango A1 inválido para stacked:", trimmed, err);
-    return [];
-  }
-
-  const { rowStart, rowEnd, colStart, colEnd } = parsed;
-  if (colEnd < colStart + 1) {
-    console.warn("El rango stacked debería incluir al menos dos columnas (etiqueta y %).", trimmed);
-  }
-
-  const segments: StackedSegment[] = [];
-
-  for (let r = rowStart; r <= rowEnd; r++) {
-    const row = values[r - 1] || [];
-    const rawLabel = row[colStart - 1];
-    const rawPercent = row[colStart];
-
-    const label = rawLabel != null ? String(rawLabel).trim() : "";
-    if (!label) continue;
-
-    let percNum = 0;
-
-    if (typeof rawPercent === "number") {
-      let v = rawPercent;
-      if (v > 0 && v <= 1) v = v * 100;
-      percNum = v;
-    } else if (typeof rawPercent === "string") {
-      const cleaned = rawPercent.replace("%", "").replace(",", ".").trim();
-      const parsedNum = parseFloat(cleaned);
-      if (!Number.isNaN(parsedNum)) percNum = parsedNum;
-    }
-
-    segments.push({ label, percentage: Number(percNum.toFixed(1)) });
-  }
-
-  return segments;
-}
-
-function makeStackedRowsSummary({
-  sheetValues = [],
-  stackedLabelCells = "",
-  stackedRangesSummary = "",
-}: ChartSvgArgs): StackedRow[] {
-  if (!sheetValues.length) return [];
-  if (!stackedRangesSummary.trim()) return [];
-
-  const labelRefs = stackedLabelCells
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const ranges = stackedRangesSummary
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const rows: StackedRow[] = [];
-
-  ranges.forEach((range, idx) => {
-    const segments = buildSummarySegmentsFromRange(sheetValues, range);
-    if (!segments.length) return;
-
-    let rowLabel = `Serie ${idx + 1}`;
-
-    const ref = labelRefs[idx];
-    if (ref) {
-      try {
-        const { row, col } = a1ToRowColSummary(ref);
-        const val = sheetValues[row - 1]?.[col - 1];
-        rowLabel = val != null && val !== "" ? String(val).trim() : ref.toUpperCase();
-      } catch {
-        rowLabel = ref.toUpperCase();
-      }
-    }
-
-    rows.push({ label: rowLabel, segments });
-  });
-
-  return rows;
 }
 
 /* ------------------------------------------------------------------ */
 /* Combined rendering                                                   */
 /* ------------------------------------------------------------------ */
-
-function svgWrapper(W: number, H: number, bg: string, content: string) {
-  return `
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect width="100%" height="100%" fill="${bg}"/>
-  ${content}
-</svg>
-`.trim();
-}
 
 function buildCombinedPoligramaSideBySide(
   leftSvg: string,
@@ -692,8 +262,7 @@ function buildTrackingPillsByBrand(args: ChartSvgArgs) {
 }
 
 function buildStacked(args: ChartSvgArgs) {
-  const stackedData: StackedRow[] =
-    args.inputMode === "summary" ? makeStackedRowsSummary(args) : makeStackedRowsRaw(args);
+  const stackedData = makeStackedRows(args);
 
   return buildStackedBarSvg({
     data: stackedData,
@@ -799,126 +368,118 @@ function buildCombined(args: ChartSvgArgs) {
   <g transform="translate(${otherW},0)">${innerTracking}</g>
       `.trim()
     );
-
-    
   }
 
   // ---------- DEFAULT combined ----------
   const brand = (a.args.brand ?? b.args.brand) as Brand | undefined;
   const isCens = brand === "censEdmundSinsa";
 
-if (isCens) {
-  // ------------------------------------------------------------------
-  // CENS Combined: A (header+title) + B (narrow plot) + C (stacked plot)
-  // ------------------------------------------------------------------
+  if (isCens) {
+    // ------------------------------------------------------------------
+    // CENS Combined: A (header+title) + B (narrow plot) + C (stacked plot)
+    // ------------------------------------------------------------------
 
-  // ✅ B) Fuerza el orden: narrow arriba, stacked abajo
-  const topChart =
-    a.chartType === "narrowvertbars"
-      ? a
-      : b.chartType === "narrowvertbars"
-      ? b
-      : a; // fallback
+    // ✅ B) Fuerza el orden: narrow arriba, stacked abajo
+    const topChart =
+      a.chartType === "narrowvertbars"
+        ? a
+        : b.chartType === "narrowvertbars"
+        ? b
+        : a; // fallback
 
-  const bottomChart = topChart === a ? b : a;
+    const bottomChart = topChart === a ? b : a;
 
-  const outBg = args.backgroundColor ?? "#ffffff";
-  const outW = 612;
-  const outH = 792;
+    const outBg = args.backgroundColor ?? "#ffffff";
+    const outW = 612;
+    const outH = 792;
 
-  // Render “base” para extraer header/plot con bounds buenos (tall rules)
-  const BASE_W = 1440;
-  const BASE_H = 1800;
+    // Render “base” para extraer header/plot con bounds buenos (tall rules)
+    const BASE_W = 1440;
+    const BASE_H = 1800;
 
-  const svgTop = chartSvgBuilders[topChart.chartType]({
-    ...topChart.args,
-    width: BASE_W,
-    height: BASE_H,
-    isCombinedMode: true,
-  });
+    const svgTop = chartSvgBuilders[topChart.chartType]({
+      ...topChart.args,
+      width: BASE_W,
+      height: BASE_H,
+      isCombinedMode: true,
+    });
 
-  const svgBottom = chartSvgBuilders[bottomChart.chartType]({
-    ...bottomChart.args,
-    width: BASE_W,
-    height: BASE_H,
-    isCombinedMode: true,
-  });
+    const svgBottom = chartSvgBuilders[bottomChart.chartType]({
+      ...bottomChart.args,
+      width: BASE_W,
+      height: BASE_H,
+      isCombinedMode: true,
+    });
 
-  // -----------------------------
-  // A) Header + título (sin escala)
-  // -----------------------------
-const headerInnerRaw = extractGroup(svgTop, "chart-header");
-const headerInner = namespaceSvgIds(headerInnerRaw, "h-");
-const headerB = extractRectBoundsFromFragment(headerInnerRaw, "header-bounds")
-  ?? { x: 0, y: 0, w: BASE_W, h: 380 }; // fallback
+    // -----------------------------
+    // A) Header + título (sin escala)
+    // -----------------------------
+    const headerInnerRaw = extractGroup(svgTop, "chart-header");
+    const headerInner = namespaceSvgIds(headerInnerRaw, "h-");
+    const headerB =
+      extractRectBoundsFromFragment(headerInnerRaw, "header-bounds") ?? { x: 0, y: 0, w: BASE_W, h: 380 }; // fallback
 
-  // -----------------------------
-  // B) Plot narrow (solo chart-plot)
-  // -----------------------------
-const topPlotInnerRaw = extractGroup(svgTop, "chart-plot");
-const topPlotInner = namespaceSvgIds(topPlotInnerRaw, "b-");
-const topPlotB =
-  extractRectBoundsFromFragment(topPlotInnerRaw, "content-bounds") ??
-  extractInnerSvgWithBounds(svgTop).bounds;
+    // -----------------------------
+    // B) Plot narrow (solo chart-plot)
+    // -----------------------------
+    const topPlotInnerRaw = extractGroup(svgTop, "chart-plot");
+    const topPlotInner = namespaceSvgIds(topPlotInnerRaw, "b-");
+    const topPlotB =
+      extractRectBoundsFromFragment(topPlotInnerRaw, "content-bounds") ??
+      extractInnerSvgWithBounds(svgTop).bounds;
 
-  // -----------------------------
-  // C) Plot stacked (solo chart-plot)
-  // -----------------------------
-const bottomPlotInnerRaw = extractGroup(svgBottom, "chart-plot");
-const bottomPlotInner = namespaceSvgIds(bottomPlotInnerRaw, "c-");
-const bottomPlotB =
-  extractRectBoundsFromFragment(bottomPlotInnerRaw, "content-bounds") ??
-  extractInnerSvgWithBounds(svgBottom).bounds;
+    // -----------------------------
+    // C) Plot stacked (solo chart-plot)
+    // -----------------------------
+    const bottomPlotInnerRaw = extractGroup(svgBottom, "chart-plot");
+    const bottomPlotInner = namespaceSvgIds(bottomPlotInnerRaw, "c-");
+    const bottomPlotB =
+      extractRectBoundsFromFragment(bottomPlotInnerRaw, "content-bounds") ??
+      extractInnerSvgWithBounds(svgBottom).bounds;
 
+    // -----------------------------
+    // Layout: A fijo, B/C se reparten el resto del alto
+    // -----------------------------
+    const TOP_PAD = 0;
+    const GAP = Math.round(outH * 0.015);
 
+    // Header H: usa bounds reales; fallback 260
+    const headerSlotH = Math.round(outH * 0.3); // 30% suele verse como tu “foto buena”
 
-  // -----------------------------
-  // Layout: A fijo, B/C se reparten el resto del alto
-  // -----------------------------
- const TOP_PAD = 0;
-const GAP = Math.round(outH * 0.015); 
+    const availableH = outH - TOP_PAD - headerSlotH - GAP;
+    const topShare = 0.44; // 👈 fijo (más estable que usar bounds.h)
+    const topH = Math.round(availableH * topShare);
+    const bottomH = availableH - topH;
 
-  // Header H: usa bounds reales; fallback 260
-const headerSlotH = Math.round(outH * 0.30); // 30% suele verse como tu “foto buena”
+    // Place header (ESCALADO)
+    const placedHeader = placeIntoSlot(headerInner, headerB, outW, headerSlotH, {
+      allowUpscale: false,
+      margin: 1,
+      alignY: "top",
+      alignX: "left",
+    });
 
-const availableH = outH - TOP_PAD - headerSlotH - GAP;
-const topShare = 0.44; // 👈 fijo (más estable que usar bounds.h)
-const topH = Math.round(availableH * topShare);
-const bottomH = availableH - topH;
+    // Place plots (ESCALADOS)
+    const placedTop = placeIntoSlot(topPlotInner, topPlotB, outW, topH, {
+      allowUpscale: true,
+      maxScale: 2.2,
+      margin: 1,
+      alignY: "top",
+      alignX: "center",
+    });
 
-  // Place header (ESCALADO)
-const placedHeader = placeIntoSlot(headerInner, headerB, outW, headerSlotH, {
-  allowUpscale: false,
-  margin: 1,
-  alignY: "top",
-  alignX: "left",
-});
+    // mismo “margen” que usa el header en la maqueta 1440
+    const LEFT_INSET = Math.round(outW * (100 / 1440)); // ~42px en 612
 
-// Place plots (ESCALADOS)
-const placedTop = placeIntoSlot(topPlotInner, topPlotB, outW, topH, {
-  allowUpscale: true,
-  maxScale: 2.2,
-  margin: 1,
-  alignY: "top",
-  alignX: "center",
-});
+    const placedBottom = placeIntoSlot(bottomPlotInner, bottomPlotB, outW - LEFT_INSET, bottomH, {
+      allowUpscale: true,
+      maxScale: 2.2,
+      margin: 1,
+      alignY: "top",
+      alignX: "left",
+    });
 
-// mismo “margen” que usa el header en la maqueta 1440
-const LEFT_INSET = Math.round(outW * (100 / 1440)); // ~42px en 612
-
-const placedBottom = placeIntoSlot(bottomPlotInner, bottomPlotB, outW - LEFT_INSET, bottomH, {
-  allowUpscale: true,
-  maxScale: 2.2,
-  margin: 1,
-  alignY: "top",
-  alignX: "left",
-});
-
-  // Si NO quieres recortes, NO uses clipPaths aquí.
-  // (Con bounds bien calculados, no debería haber overflow)
-
-
-return `
+    return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${outW}" height="${outH}" viewBox="0 0 ${outW} ${outH}">
   <rect width="100%" height="100%" fill="${outBg}"/>
   <g transform="translate(0,${TOP_PAD})">${placedHeader}</g>
@@ -926,7 +487,8 @@ return `
   <g transform="translate(${LEFT_INSET},${TOP_PAD + headerSlotH + topH + GAP})">${placedBottom}</g>
 </svg>
 `.trim();
-}
+  }
+
   if (deskover) {
     const BASE_W = 1920;
     const BASE_H = 1080;
@@ -954,8 +516,18 @@ return `
 
   // Poligrama: side-by-side half/half
   const halfW = Math.round(W / 2);
-  const svgA = chartSvgBuilders[a.chartType]({ ...a.args, width: halfW, height: H, isCombinedMode: true });
-  const svgB = chartSvgBuilders[b.chartType]({ ...b.args, width: halfW, height: H, isCombinedMode: true });
+  const svgA = chartSvgBuilders[a.chartType]({
+    ...a.args,
+    width: halfW,
+    height: H,
+    isCombinedMode: true,
+  });
+  const svgB = chartSvgBuilders[b.chartType]({
+    ...b.args,
+    width: halfW,
+    height: H,
+    isCombinedMode: true,
+  });
   return buildCombinedPoligramaSideBySide(svgA, svgB, W, H, bg);
 }
 

@@ -15,6 +15,8 @@ import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
 import { getBrandTheme } from "@/lib/brand-theme";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
+import { parseA1Range, a1ToRowCol } from "@/lib/Summary/a1";
+
 
 
 export type ChartType =
@@ -49,32 +51,6 @@ export interface FrequencyData {
 
 type InputMode = "raw" | "summary";
 
-/* Helpers A1 */
-
-function a1ToRowCol(a1: string) {
-  const match = a1.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
-  if (!match) {
-    throw new Error(`Referencia A1 inválida: ${a1}`);
-  }
-  const [, colLetters, rowStr] = match;
-  let col = 0;
-  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
-  const row = parseInt(rowStr, 10);
-  if (!row || row < 1) throw new Error(`Fila inválida en referencia A1: ${a1}`);
-  return { row, col };
-}
-
-function parseA1Range(range: string) {
-  const [startStr, endStr] = range.split(":");
-  const start = a1ToRowCol(startStr);
-  const end = endStr ? a1ToRowCol(endStr) : start;
-  return {
-    rowStart: Math.min(start.row, end.row),
-    rowEnd: Math.max(start.row, end.row),
-    colStart: Math.min(start.col, end.col),
-    colEnd: Math.max(start.col, end.col),
-  };
-}
 function buildMediumDonutSummary(values: any[][], range: string): FrequencyData[] {
   const trimmed = range.trim();
   if (!trimmed) return [];
