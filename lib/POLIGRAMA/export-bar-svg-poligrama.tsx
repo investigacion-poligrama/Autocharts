@@ -1,5 +1,5 @@
 import { ChartConfig } from "@/lib/chartconfig";
-import type { FrequencyData } from "@/app/page";
+import type { FrequencyData } from "@/types/charts";
 
 const PALETTE = [
   ChartConfig.colors.primary,
@@ -221,7 +221,7 @@ const centeredX1 = centeredX0 + colWidth;
 
   const layouts: LayoutRow[] = [];
 
-  const numCols = rows > 8 ? 2 : 1;
+  const numCols = isTall1440 ? 1 : rows > 8 ? 2 : 1;
 
   if (numCols === 1) {
   const x0 = centeredX0;
