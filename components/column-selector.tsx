@@ -143,7 +143,7 @@ export function ColumnSelector({
     PAN: "#1261d6",
     PT: "#ff0000",
     MC: "#fa8500",
-    MORENA: "#b3251e",
+    MORENA: "#83322e",
     PVEM: "#03ff7b",
     VIDA: "#1b8fd0",
     Ninguno: "#485470",

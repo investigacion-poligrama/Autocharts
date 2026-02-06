@@ -232,9 +232,7 @@ export function buildTrackingSvg({
   hideLegend,
 }: ChartSvgArgs): string {
   const W = width ?? CANVAS_W;
-  const H = height ?? CANVAS_H;
-
-  
+  const H = height ?? CANVAS_H;  
 
   const bg = backgroundColor ?? "#000000";
   const mainTextColor = textColor ?? "#ffffff";
@@ -543,7 +541,7 @@ if (!shouldHideLegend) {
         `<text x="${pt.x}" y="${labelY}"
           fill="${color}"
           font-family="Helvetica, Arial, sans-serif"
-          font-size="18"
+          font-size="22"
           font-weight="700"
           text-anchor="middle">
           ${v.toFixed(1)}%
