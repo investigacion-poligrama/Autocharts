@@ -1,5 +1,5 @@
 // export-bar-mikeflores.ts
-import type { FrequencyData } from "@/app/page";
+import type { FrequencyData } from "@/types/charts";
 
 type MikeBuildBarSvgArgs = {
   data: FrequencyData[];
@@ -44,9 +44,11 @@ function clampPercent(raw: unknown): number {
 }
 
 function formatPct(v: number): string {
-  // La foto se ve “sin decimales” (27%, 16%, etc.)
-  return `${Math.round(v)}%`;
+  // 1 decimal, pero si termina en .0 lo quita (opcional)
+  const s = (Math.round(v * 10) / 10).toFixed(1);
+  return s.endsWith(".0") ? `${s.slice(0, -2)}%` : `${s}%`;
 }
+
 
 function darkenHex(hex: string, factor = 0.55): string {
   const clean = hex.replace("#", "");
