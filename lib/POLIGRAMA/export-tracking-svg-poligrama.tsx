@@ -427,22 +427,24 @@ if (!shouldHideLegend) {
       }
       if (current) lines.push(current);
       if (lines.length > 2) lines = [lines[0], lines.slice(1).join(" ")];
-
       const lineGap = 2;
-      const firstLineY = cy - ((lines.length - 1) * (legendFs + lineGap)) / 2;
+      const step = legendFs + lineGap;                 // salto vertical entre líneas
+      const totalShift = (lines.length - 1) * step;    // alto extra del bloque vs 1 línea
 
       parts.push(
-        `<text x="${cx}" y="${firstLineY}"
+        `<text x="${cx}" y="${cy}"
           fill="${textFill}"
           font-family="Helvetica, Arial, sans-serif"
           font-size="${legendFs}"
           font-weight="700"
-          text-anchor="middle">` +
+          text-anchor="middle"
+          dominant-baseline="middle">` +
           lines.map((line, idx2) =>
-            `<tspan x="${cx}" dy="${idx2 === 0 ? 0 : legendFs + lineGap}">${esc(line)}</tspan>`
+            `<tspan x="${cx}" dy="${idx2 === 0 ? -totalShift / 2 : step}">${esc(line)}</tspan>`
           ).join("") +
         `</text>`
       );
+
     });
   };
 
@@ -455,8 +457,8 @@ if (!shouldHideLegend) {
 
   // -------- GRID vertical con huecos ----------
   const GRID_STROKE = "#E6E6E6";
-  const GRID_WIDTH = 0.25;
-  const GRID_OPACITY = 0.35;
+  const GRID_WIDTH = 0.6;
+  const GRID_OPACITY = 0.7;
   const holeRadius = 10;
 
   months.forEach((_, i) => {
@@ -485,30 +487,51 @@ if (!shouldHideLegend) {
 
     let lastY = chartY0;
     yPoints.forEach((y) => {
-      const yEnd = y - holeRadius;
-      if (yEnd > lastY) {
-        parts.push(
-          `<line x1="${x}" y1="${lastY}" x2="${x}" y2="${yEnd}"
-            stroke="${GRID_STROKE}"
-            stroke-width="${GRID_WIDTH}"
-            opacity="${GRID_OPACITY}"
-            shape-rendering="crispEdges"
-            stroke-linecap="square" />`
-        );
-      }
-      lastY = y + holeRadius;
+      const yPoints = categories
+  .map((cat) => cat.values[i])
+  .filter((v) => v > 0)
+  .map((value) => chartY0 + chartHeight - (value / yMax) * chartHeight)
+  .sort((a, b) => a - b);
+
+if (!yPoints.length) return;
+
+// 👇 ahora la línea NO inicia en chartY0, inicia en el punto más alto
+const yTop = yPoints[0];
+
+// si quieres conservar el “hueco” alrededor del punto más alto, arranca debajo del hueco:
+let lastY = yTop;
+
+// recorre desde el 2do punto (porque el 1ro ya lo usamos como “tope”)
+for (let j = 1; j < yPoints.length; j++) {
+  const y = yPoints[j];
+  const yEnd = y - holeRadius;
+
+  if (yEnd > lastY) {
+    parts.push(
+      `<line x1="${x}" y1="${lastY}" x2="${x}" y2="${yEnd}"
+        stroke="${GRID_STROKE}"
+        stroke-width="${GRID_WIDTH}"
+        opacity="${GRID_OPACITY}"
+        shape-rendering="crispEdges"
+        stroke-linecap="square" />`
+    );
+  }
+  lastY = y + holeRadius;
+}
+
+// último tramo: hasta abajo del chart
+if (lastY < chartY0 + chartHeight) {
+  parts.push(
+    `<line x1="${x}" y1="${lastY}" x2="${x}" y2="${chartY0 + chartHeight}"
+      stroke="${GRID_STROKE}"
+      stroke-width="${GRID_WIDTH}"
+      opacity="${GRID_OPACITY}"
+      shape-rendering="crispEdges"
+      stroke-linecap="square" />`
+  );
+}
     });
 
-    if (lastY < chartY0 + chartHeight) {
-      parts.push(
-        `<line x1="${x}" y1="${lastY}" x2="${x}" y2="${chartY0 + chartHeight}"
-          stroke="${GRID_STROKE}"
-          stroke-width="${GRID_WIDTH}"
-          opacity="${GRID_OPACITY}"
-          shape-rendering="crispEdges"
-          stroke-linecap="square" />`
-      );
-    }
   });
 
   // --------- Líneas + puntos + labels (%) ----------

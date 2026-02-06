@@ -72,7 +72,7 @@ export function extractGroup(svg: string, groupId: string): string {
 }
 
 export function extractRectBoundsFromFragment(fragment: string, rectId: string): SvgBounds | null {
-  const re = new RegExp(`<rect[^>]*id="${rectId}"[^>]*>`, "i");
+const re = new RegExp(`<rect[^>]*id="${rectId}"[^>]*\/?>`, "i");
   const m = fragment.match(re);
   if (!m) return null;
 
@@ -129,34 +129,38 @@ export function extractChartContent(svg: string, wantBounds: boolean): Extracted
     else depth++;
 
     if (depth === 0) {
-      const contentEnd = match.index;
-      const inner = svg.slice(contentStart, contentEnd);
+  const contentEnd = match.index;
+  let inner = svg.slice(contentStart, contentEnd);
 
-      if (!wantBounds) return { inner, bounds: null };
+  if (!wantBounds) return { inner, bounds: null };
 
-      // 1) busca content-bounds dentro del inner
-      const rectMatch = inner.match(/<rect[^>]*id="content-bounds"[^>]*>/i);
-      if (!rectMatch) {
-        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
-      }
+  // 1) busca content-bounds dentro del inner
+  const rectMatch = inner.match(/<rect[^>]*id="content-bounds"[^>]*\/?>/i);
+  if (!rectMatch) {
+    return { inner, bounds: getFallbackBoundsFromSvg(svg) };
+  }
 
-      const rect = rectMatch[0];
-      const getNum = (attr: string) => {
-        const m = rect.match(new RegExp(`${attr}="([^"]+)"`, "i"));
-        return m ? Number(m[1]) : NaN;
-      };
+  const rect = rectMatch[0];
 
-      const x = getNum("x");
-      const y = getNum("y");
-      const w = getNum("width");
-      const h = getNum("height");
+  const getNum = (attr: string) => {
+    const m = rect.match(new RegExp(`${attr}="([^"]+)"`, "i"));
+    return m ? Number(m[1]) : NaN;
+  };
 
-      if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) {
-        return { inner, bounds: getFallbackBoundsFromSvg(svg) };
-      }
+  const x = getNum("x");
+  const y = getNum("y");
+  const w = getNum("width");
+  const h = getNum("height");
 
-      return { inner, bounds: { x, y, w, h } };
-    }
+  // ✅ quitar el rect del inner para que Illustrator NO lo tome como bounds
+  inner = inner.replace(rect, "");
+
+  if ([x, y, w, h].some((n) => !Number.isFinite(n) || n <= 0)) {
+    return { inner, bounds: getFallbackBoundsFromSvg(svg) };
+  }
+
+  return { inner, bounds: { x, y, w, h } };
+}
   }
 
   return { inner: "", bounds: wantBounds ? getFallbackBoundsFromSvg(svg) : null };
@@ -242,9 +246,14 @@ export function placeIntoSlot(
 /* ------------------------------------------------------------------ */
 
 export function svgWrapper(W: number, H: number, bg: string, content: string) {
+  const Wpt = +(W * 0.75).toFixed(3); // px->pt (96->72)
+  const Hpt = +(H * 0.75).toFixed(3);
+
   return `
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="${Wpt}pt" height="${Hpt}pt"
+     viewBox="0 0 ${W} ${H}">
   <rect width="100%" height="100%" fill="${bg}"/>
   ${content}
 </svg>
