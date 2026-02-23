@@ -45,6 +45,8 @@ import { makeStackedRows } from "@/lib/Summary/stacked";
 /* Types                                                              */
 /* ------------------------------------------------------------------ */
 
+export type CombinedLayout = "20/80" | "40/60";
+
 export interface ChartSvgArgs {
   data: FrequencyData[];
   title: string;
@@ -90,6 +92,7 @@ export interface ChartSvgArgs {
     { chartType: ChartType; args: ChartSvgArgs; title?: string }
   ];
   isCombinedMode?: boolean;
+  combinedLayout?: CombinedLayout;
 
   // misc
   hideLegend?: boolean;
@@ -108,6 +111,11 @@ function isDeskoverBrand(a?: Brand) {
 /* ------------------------------------------------------------------ */
 /* Combined rendering                                                   */
 /* ------------------------------------------------------------------ */
+
+const POLIGRAMA_COMBINED_PRESETS = {
+  "20/80": { leftShare: 0.30, gap: 3, leftPadX: 16, rightPadX: 16 },
+  "40/60": { leftShare: 0.42, gap: -130, leftPadX: 8,  rightPadX: 8  },
+} as const;
 
 function buildCombinedPoligramaSideBySide(
   leftSvg: string,
@@ -337,36 +345,83 @@ function buildCombined(args: ChartSvgArgs) {
     }
 
     // Poligrama: izquierda/derecha
-    const otherW = Math.round(W * 0.25);
-    const trackingW = W - otherW;
+const OUTER_PAD_X = 120; // ✅ margen desde el canvas al inicio del contenido (como tus charts normales)
 
-    const svgOther = chartSvgBuilders[otherChart.chartType]({
-      ...otherChart.args,
-      width: otherW,
-      height: H,
-      isCombinedMode: true,
-    });
+const layout = (a.args.combinedLayout ?? b.args.combinedLayout ?? "20/80") as CombinedLayout;
+const preset = POLIGRAMA_COMBINED_PRESETS[layout];
 
-    const svgTracking = chartSvgBuilders[trackingChart.chartType]({
-      ...trackingChart.args,
-      width: trackingW,
-      height: H,
-      isCombinedMode: true,
-      hideLegend: true,
-    });
+// ancho útil real dentro del frame
+const innerW = W - OUTER_PAD_X * 2;
 
-    const innerOther = extractInnerSvg(svgOther);
-    const innerTracking = extractInnerSvg(svgTracking);
+const leftW = Math.round((innerW - preset.gap) * preset.leftShare);
+const rightW = innerW - preset.gap - leftW;
 
-    return svgWrapper(
-      W,
-      H,
-      bg,
-      `
-  <g transform="translate(0,0)">${innerOther}</g>
-  <g transform="translate(${otherW},0)">${innerTracking}</g>
-      `.trim()
-    );
+
+const svgOther = chartSvgBuilders[otherChart.chartType]({
+  ...otherChart.args,
+  width: leftW,
+  height: H,
+  isCombinedMode: true,
+});
+
+const svgTracking = chartSvgBuilders[trackingChart.chartType]({
+  ...trackingChart.args,
+  width: rightW,
+  height: H,
+  isCombinedMode: true,
+  hideLegend: true,
+});
+
+// ✅ bounds reales (si existen)
+const A = extractInnerSvgWithBounds(svgOther);
+const B = extractInnerSvgWithBounds(svgTracking);
+
+const innerA = namespaceSvgIds(A.inner, "c1-");
+const innerB = namespaceSvgIds(B.inner, "c2-");
+
+const padL = preset.leftPadX;
+const padR = preset.rightPadX;
+
+const slotLW = leftW - padL * 2;
+const slotRW = rightW - padR * 2;
+// ✅ bounds "canvas" (para respetar el mismo inicio que no-combined)
+const boundsCanvasLeft  = { x: 0, y: 0, w: leftW,  h: H };
+const boundsCanvasRight = { x: 0, y: 0, w: rightW, h: H };
+
+// escala común (solo depende de ancho porque h:H == slotH:H)
+const fitA = slotLW / leftW;
+const fitB = slotRW / rightW;
+const commonScale = Math.min(fitA, fitB);
+
+const placedA = placeIntoSlot(innerA, boundsCanvasLeft, slotLW, H, {
+  allowUpscale: true,
+  maxScale: 1.8,
+  margin: 1.0,
+  forceScale: commonScale,
+  alignX: "center",
+  alignY: "top", 
+});
+
+const placedB = placeIntoSlot(innerB, boundsCanvasRight, slotRW, H, {
+  allowUpscale: true,
+  maxScale: 1.8,
+  margin: 1.0,
+  forceScale: commonScale,
+  alignX: "left",
+  alignY: "top", 
+});
+const xLeft = OUTER_PAD_X + padL;
+const xRight = OUTER_PAD_X + leftW + preset.gap + padR;
+
+return svgWrapper(
+  W,
+  H,
+  bg,
+  `
+    <g transform="translate(${xLeft},0)">${placedA}</g>
+    <g transform="translate(${xRight},0)">${placedB}</g>
+  `.trim()
+);
   }
 
   // ---------- DEFAULT combined ----------
@@ -514,20 +569,66 @@ function buildCombined(args: ChartSvgArgs) {
   }
 
   // Poligrama: side-by-side half/half
-  const halfW = Math.round(W / 2);
-  const svgA = chartSvgBuilders[a.chartType]({
-    ...a.args,
-    width: halfW,
-    height: H,
-    isCombinedMode: true,
-  });
-  const svgB = chartSvgBuilders[b.chartType]({
-    ...b.args,
-    width: halfW,
-    height: H,
-    isCombinedMode: true,
-  });
-  return buildCombinedPoligramaSideBySide(svgA, svgB, W, H, bg);
+  const layout = (a.args.combinedLayout ?? b.args.combinedLayout) as
+  | "20/80"
+  | "40/60"
+  | undefined;
+
+const leftShare = layout === "40/60" ? 0.40 : 0.20;
+const leftW = Math.round(W * leftShare);
+const rightW = W - leftW;
+
+// render a tamaños “slot”
+const svgA = chartSvgBuilders[a.chartType]({
+  ...a.args,
+  width: leftW,
+  height: H,
+  isCombinedMode: true,
+});
+
+const svgB = chartSvgBuilders[b.chartType]({
+  ...b.args,
+  width: rightW,
+  height: H,
+  isCombinedMode: true,
+});
+
+// 👇 usa bounds (si tus svgs traen content-bounds)
+const A = extractInnerSvgWithBounds(svgA);
+const B = extractInnerSvgWithBounds(svgB);
+
+const innerA = namespaceSvgIds(A.inner, "c1-");
+const innerB = namespaceSvgIds(B.inner, "c2-");
+
+// en 40/60 dale más “apertura” al bar (menos margen)
+const marginA = layout === "40/60" ? 1 : 0.98;
+const marginB = 0.98;
+
+const placedA = placeIntoSlot(innerA, A.bounds, leftW, H, {
+  allowUpscale: true,
+  maxScale: 1.6,
+  margin: marginA,
+  alignX: "center",
+  alignY: "center",
+});
+
+const placedB = placeIntoSlot(innerB, B.bounds, rightW, H, {
+  allowUpscale: true,
+  maxScale: 1.6,
+  margin: marginB,
+  alignX: "left",
+  alignY: "center",
+});
+
+return svgWrapper(
+  W,
+  H,
+  bg,
+  `
+    <g transform="translate(0,0)">${placedA}</g>
+    <g transform="translate(${leftW},0)">${placedB}</g>
+  `.trim()
+);
 }
 
 /* ------------------------------------------------------------------ */

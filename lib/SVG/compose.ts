@@ -205,7 +205,7 @@ export function placeIntoSlot(
     maxScale?: number;
     margin?: number;
     forceScale?: number;
-    alignY?: "center" | "top";
+    alignY?: "top" | "center" | "bottom";
     alignX?: "center" | "left";
   }
 ) {

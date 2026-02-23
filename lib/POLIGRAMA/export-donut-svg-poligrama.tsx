@@ -1,5 +1,5 @@
 import { ChartConfig } from "@/lib/chartconfig";
-import type { FrequencyData } from "@/app/page";
+import type { FrequencyData } from "@/types/charts";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;

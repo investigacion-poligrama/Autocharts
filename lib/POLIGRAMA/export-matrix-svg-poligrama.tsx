@@ -3,8 +3,7 @@ import type { ChartSvgArgs } from "@/lib/chart-svgs";
 
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
-const FONT_STACK =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+const FONT_STACK = "Helvetica, Arial, sans-serif";
 
 const esc = (s?: string | null) =>
   (s ?? "")

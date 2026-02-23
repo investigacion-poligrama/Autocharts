@@ -9,6 +9,7 @@ import { chartSvgBuilders } from "@/lib/chart-svgs";
 import { useExportQueue } from "@/lib/export-queue";
 import type { Brand } from "@/types/brand";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
+import type { CombinedLayout } from "@/lib/chart-svgs";
 
 interface ChartPreviewProps {
   chartType: ChartType;
@@ -41,6 +42,8 @@ interface ChartPreviewProps {
   onStartCombine?: () => void;
   onSaveCombined?: () => void;
   onCancelCombine?: () => void;
+  combinedLayout?: CombinedLayout;
+  onCombinedLayoutChange?: (v: CombinedLayout) => void;
 }
 
 export default function ChartPreview({
@@ -74,6 +77,8 @@ export default function ChartPreview({
   onStartCombine,
   onSaveCombined,
   onCancelCombine,
+  combinedLayout,
+  onCombinedLayoutChange,
 }: ChartPreviewProps) {
   const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,6 +110,7 @@ export default function ChartPreview({
     backgroundColor: previewBg?.trim() ? previewBg : undefined,
     textColor: previewTextColor?.trim() ? previewTextColor : undefined,
     brand: brand ?? "poligrama",
+    combinedLayout,
   });
 
   useEffect(() => {
@@ -219,6 +225,28 @@ export default function ChartPreview({
               </Button>
             </>
           )}
+        {brand === "poligrama" && (
+          <div className="inline-flex gap-2 text-xs ml-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={!!isCombineMode} 
+              variant={combinedLayout === "20/80" ? "default" : "outline"}
+              onClick={() => onCombinedLayoutChange?.("20/80")}
+            >
+              Combinado A
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!!isCombineMode}
+              variant={combinedLayout === "40/60" ? "default" : "outline"}
+              onClick={() => onCombinedLayoutChange?.("40/60")}
+            >
+              Combinado B
+            </Button>
+          </div>
+        )}
         </div>
       </div>
 

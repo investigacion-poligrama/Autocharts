@@ -455,6 +455,7 @@ if (!shouldHideLegend) {
 
   parts.push(`<g id="chart-content">`);
 
+
   // -------- GRID vertical con huecos ----------
   const GRID_STROKE = "#E6E6E6";
   const GRID_WIDTH = 0.6;
@@ -574,6 +575,18 @@ if (lastY < chartY0 + chartHeight) {
   });
 
   const MONTH_LABEL_Y_OFFSET = 55;
+    const boundsPadTop = 40;
+  const boundsPadBottom = 40;
+
+  const boundsX = chartX0;                 // arranca donde empieza el plot real
+  const boundsY = chartY0 - boundsPadTop;  // sube para labels
+  const boundsW = chartWidth;              // ancho real del plot
+  const boundsH =
+    (chartHeight + MONTH_LABEL_Y_OFFSET) + boundsPadTop + boundsPadBottom;
+
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}" fill="none" />`
+  );
 
   months.forEach((month, i) => {
     const x =

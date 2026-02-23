@@ -184,8 +184,8 @@ const fullX0 = marginLeftLabels;
 const fullX1 = W - marginRight;
 const fullWidth = fullX1 - fullX0;
 
-// ↓ Ajusta este factor (0.65–0.85) como quieras
-const widthFactor = rows >= 9 ? 1 : 0.72;
+const isCombined = (width ?? CANVAS_W) !== CANVAS_W; // o pásalo explícito como prop
+const widthFactor = isCombined ? 1 : (rows >= 9 ? 1 : 0.72);
 
 const colWidth = fullWidth * widthFactor;
 
@@ -220,6 +220,10 @@ const centeredX1 = centeredX0 + colWidth;
   };
 
   const layouts: LayoutRow[] = [];
+  const BAR_GAP = 75;      // separación fija entre barras (px)
+  const BAR_MIN_H = 14;    // mínimo grosor barra
+  const BAR_MAX_H = 55;    // máximo grosor barra
+
 
   const numCols = isTall1440 ? 1 : rows > 8 ? 2 : 1;
 
@@ -228,9 +232,18 @@ const centeredX1 = centeredX0 + colWidth;
   const x1 = centeredX1;
   const colWidth = x1 - x0;
   const barMaxWidth = colWidth - percZoneWidth;
+  
 
-    const gap = barAreaHeight / (rows * 2);
-    const barHeight = gap;
+    const gap = BAR_GAP;
+
+// espacio disponible para barras descontando gaps
+const availableH = barAreaHeight - (rows - 1) * gap;
+
+// altura ideal por barra (variable)
+const rawBarH = availableH / rows;
+
+// clamp para que no se hagan enormes o microscópicas
+const barHeight = Math.max(BAR_MIN_H, Math.min(BAR_MAX_H, rawBarH));
 
     normalized.forEach((item, idx) => {
       layouts.push({
@@ -259,8 +272,11 @@ const centeredX1 = centeredX0 + colWidth;
       const x1 = x0 + colWidth;
       const barMaxWidth = colWidth - percZoneWidth;
 
-      const gap = barAreaHeight / (count * 2);
-      const barHeight = gap;
+      const gap = BAR_GAP;
+      const availableH = barAreaHeight - (count - 1) * gap;
+      const rawBarH = availableH / count;
+      const barHeight = Math.max(BAR_MIN_H, Math.min(BAR_MAX_H, rawBarH));
+
 
       for (let i = 0; i < count; i++) {
         const item = normalized[startIdx + i];
@@ -286,7 +302,7 @@ const centeredX1 = centeredX0 + colWidth;
   layouts.forEach((layout, idx) => {
     const { item, x0, x1, barMaxWidth, gap, barHeight, rowInCol } = layout;
 
-    const centerY = barAreaTop + gap * (1 + 2 * rowInCol);
+    const centerY = barAreaTop + rowInCol * (barHeight + gap) + barHeight / 2;
     const top = centerY - barHeight / 2;
     const valueWidth = (barMaxWidth * item.value) / 100;
 
@@ -370,12 +386,18 @@ const centeredX1 = centeredX0 + colWidth;
 
   const logoX = W - marginRight;
   const logoY0 = marginTop - 24;
+  // bounds SOLO del área de barras (incluye % a la derecha)
+  const boundsX = centeredX0;                       // o marginLeftLabels si quieres full
+  const boundsY = barAreaTop - 40;                  // un poquito arriba para labels
+  const boundsW = (centeredX1 - centeredX0) + percZoneWidth; // incluye % zone
+  const boundsH = (barAreaBottom - (barAreaTop - 40)) + 20;
 
   parts.push(`<g id="chart-content">`);
-parts.push(`<g>`, ...bars, `</g>`);
-parts.push(`</g>`);
-
-
+  parts.push(
+    `<rect id="content-bounds" x="${boundsX}" y="${boundsY}" width="${boundsW}" height="${boundsH}" fill="none" />`
+  );
+  parts.push(`<g>`, ...bars, `</g>`);
+  parts.push(`</g>`);
   parts.push(`</svg>`);
 
   return parts.join("\n");

@@ -15,6 +15,7 @@ import { getBrandTheme } from "@/lib/brand-theme";
 import type { ChartSvgArgs } from "@/lib/chart-svgs";
 import { parseA1Range, a1ToRowCol } from "@/lib/Summary/a1";
 import type { ChartType, FrequencyData, DatasetColumn } from "@/types/charts";
+import type { CombinedLayout } from "@/lib/chart-svgs";
 
 
 type InputMode = "raw" | "summary";
@@ -185,7 +186,8 @@ function buildMatrixFrequencies(values: any[][], range: string): FrequencyData[]
 
 export default function Home() {
   const { items, addChart, downloadZip } = useExportQueue();
-
+  type CombinedLayout = "20/80" | "40/60";
+  const [combinedLayout, setCombinedLayout] = useState<CombinedLayout>("20/80");
   const [datasetUrl, setDatasetUrl] = useState("");
   const [columns, setColumns] = useState<DatasetColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string>("");
@@ -250,6 +252,7 @@ export default function Home() {
     secondAnswerRange,
     brand: brand ?? "poligrama",
     questionCell,
+    combinedLayout,
   };
 
   setFirstChartForCombine({
@@ -262,7 +265,7 @@ export default function Home() {
 };
 const handleSaveCombined = async () => {
   if (!firstChartForCombine) return;
-
+  const layoutToUse = firstChartForCombine.args.combinedLayout ?? "20/80";
   const combinedArgs: ChartSvgArgs = {
     data: [],
     title: "combined",
@@ -271,6 +274,7 @@ const handleSaveCombined = async () => {
     backgroundColor: previewBg,
     textColor: previewTextColor,
     sheetTitle: selectedSheet,
+    combinedLayout: layoutToUse,
     combinedCharts: [
       firstChartForCombine,
       {
@@ -297,6 +301,7 @@ const handleSaveCombined = async () => {
           secondAnswerRange,
           brand: brand ?? "poligrama",
           questionCell,
+          combinedLayout: layoutToUse,
         },
         title: selectedColumn,
       },
@@ -868,6 +873,8 @@ const handleSaveCombined = async () => {
                 onCancelCombine={() => {
                   setFirstChartForCombine(null);
                   setCombineMode(false);}}
+                combinedLayout={brand === "poligrama" ? combinedLayout : undefined}
+                onCombinedLayoutChange={brand === "poligrama" ? setCombinedLayout : undefined}
               />
             )}
 
