@@ -134,7 +134,7 @@ export function ColumnSelector({
     useState<RangePickerTarget | null>(null);
 
   const availableColors: Record<string, string> = {
-    MuyBuena_Si: "#00a651",
+    MuyBuena_Si: "#01793b",
     Buena: "#72c478",
     Regular: "#c37171",
     Mala: "#a93838",
@@ -146,11 +146,12 @@ export function ColumnSelector({
     MORENA: "#83322e",
     PVEM: "#03ff7b",
     VIDA: "#1b8fd0",
-    Ninguno: "#485470",
-    NS: "#9d9d9c",
+    Ninguno: "#797a7c",
+    NS: "#4d4d4d",
     Hombre: "#2d3182",
     Mujer: "#dc0180",
     Poligrama: "#9fff6a",
+    Otro: "#eaeaea",
   };
 
   const normalize = (s: string) =>
