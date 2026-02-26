@@ -419,6 +419,8 @@ const boundsH = Math.max(1, boundsBottom - boundsY);
     }
 
     pts.forEach((p, i) => {
+      const decimals = 1; // o 2 si quieres
+      const fmt = (n: number) => n.toFixed(decimals);
       const v = cat.values[i];
       parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${pointR}" fill="${color}" />`);
       parts.push(
@@ -428,7 +430,7 @@ const boundsH = Math.max(1, boundsBottom - boundsY);
           font-size="${pctFs}"
           font-weight="800"
           text-anchor="middle"
-          dominant-baseline="alphabetic">${esc(v.toFixed(0))}%</text>`
+          dominant-baseline="alphabetic">${esc(fmt(v))}%</text>`
       );
     });
   });
