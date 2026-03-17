@@ -303,7 +303,7 @@ const pillX = blockLeft + idx * (PILL_W + PILL_GAP);
   `<rect x="${pillX}" y="${rectY}" width="${PILL_W}" height="${rectH}"
     rx="12" fill="none"/>`,
   `<text x="${pillX + PILL_W / 2}" y="${rectY + rectH / 2}" fill="${mainTextColor}"
-    font-size="20" font-weight="700" text-anchor="middle"
+    font-size="28" font-weight="700" text-anchor="middle"
     dominant-baseline="middle" font-family="${FONT_STACK}">
     ${esc(label)}
   </text>`);
@@ -362,7 +362,7 @@ parts.push(
   `<rect x="${cellPillX}" y="${y + pillYOffset}" width="${PILL_W}" height="${pillH}"
     rx="12" fill="${baseHex}" fill-opacity="${alpha}"/>`,
   `<text x="${cellPillX + PILL_W / 2}" y="${y + pillYOffset + pillH / 2}"
-    fill="${mainTextColor}" font-size="20" font-weight="700"
+    fill="${mainTextColor}" font-size="28" font-weight="700"
     text-anchor="middle" dominant-baseline="middle"
     font-family="${FONT_STACK}">
     ${fmtPct(pct)}%

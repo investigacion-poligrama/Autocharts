@@ -383,12 +383,22 @@ if (!shouldHideLegend) {
   };
 
   const layoutTop = () => {
-    const pillCols = 3; // recomendado para 1440px; ajusta si quieres
+    const pillCols = 3;
     const availableW = W - marginLeft - marginRight;
     const pillWidth = (availableW - (pillCols - 1) * pillGapX) / pillCols;
+    const rows = Math.ceil(categories.length / pillCols);
+    const blockWidth = pillCols * pillWidth + (pillCols - 1) * pillGapX;
 
-    const legendX = marginLeft;
-    const legendY = contentTopBase + legendTopGap;
+const blockHeight =
+  rows * pillHeight + (rows - 1) * pillGapY;
+const legendX =
+  marginLeft + (availableW - blockWidth) / 2;
+    const availableH =
+  (H - marginBottom - 120) - contentTopBase;
+
+const legendY =
+  contentTopBase + (availableH - blockHeight) / 2;
+
 
     drawPills(legendX, legendY, pillCols, pillWidth);
   };
@@ -458,8 +468,8 @@ if (!shouldHideLegend) {
 
   // -------- GRID vertical con huecos ----------
   const GRID_STROKE = "#E6E6E6";
-  const GRID_WIDTH = 0.6;
-  const GRID_OPACITY = 0.7;
+  const GRID_WIDTH = 0.3;
+  const GRID_OPACITY = 0.3;
   const holeRadius = 10;
 
   months.forEach((_, i) => {
